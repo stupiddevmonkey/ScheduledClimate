@@ -5,10 +5,10 @@
   "codeowners": ["@stephen"],
   "config_flow": true,
   "dependencies": ["http", "schedule"],
-  "documentation": "https://github.com/stephen/ScheduledClimate",
+  "documentation": "https://github.com/stephenmann/ScheduledClimate",
   "integration_type": "service",
   "iot_class": "calculated",
-  "issue_tracker": "https://github.com/stephen/ScheduledClimate/issues",
+  "issue_tracker": "https://github.com/stephenmann/ScheduledClimate/issues",
   "requirements": [],
-  "version": "0.4.0"
+  "version": "1.0.0"
 }
