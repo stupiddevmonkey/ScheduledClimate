@@ -5,3 +5,4 @@ __pycache__/
 .coverage
 htmlcov/
 frontend/node_modules/
+.github/plans

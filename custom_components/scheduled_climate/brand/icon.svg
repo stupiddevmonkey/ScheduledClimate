@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title">
+  <title id="title">Scheduled Climate</title>
+  <circle cx="256" cy="256" r="246" fill="#16856f"/>
+  <rect x="82" y="104" width="348" height="326" rx="52" fill="#fff"/>
+  <path d="M82 186h348v34H82z" fill="#16856f"/>
+  <rect x="142" y="68" width="38" height="94" rx="19" fill="#16856f"/>
+  <rect x="332" y="68" width="38" height="94" rx="19" fill="#16856f"/>
+  <rect x="226" y="236" width="60" height="128" rx="30" fill="#ef5b35"/>
+  <circle cx="256" cy="360" r="62" fill="#ef5b35"/>
+  <rect x="241" y="254" width="30" height="106" rx="15" fill="#fff"/>
+  <circle cx="256" cy="360" r="39" fill="#fff"/>
+  <rect x="249" y="286" width="14" height="76" rx="7" fill="#ef5b35"/>
+  <circle cx="256" cy="360" r="25" fill="#ef5b35"/>
+</svg>

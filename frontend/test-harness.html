@@ -7,72 +7,181 @@
     <style>
       :root {
         --primary-color: #147d64;
+        --state-climate-heat-color: #e45d35;
         --primary-text-color: #202522;
         --secondary-text-color: #65706a;
         --text-primary-color: #fff;
         --card-background-color: #fff;
+        --secondary-background-color: #f5f7f6;
         --divider-color: #d9dfdc;
         --ha-card-border-radius: 8px;
       }
-      body { margin: 0; padding: 24px; background: #edf1ef; font-family: "Segoe UI", sans-serif; }
-      scheduled-climate-card { display: block; width: min(100%, 520px); margin: 0 auto; }
+      * { box-sizing: border-box; }
+      body { margin: 0; min-height: 100vh; background: #edf1ef; color: var(--primary-text-color); font-family: "Segoe UI", sans-serif; }
+      .app-bar { height: 56px; display: flex; align-items: center; gap: 14px; padding: 0 20px; color: #fff; background: #147d64; box-shadow: 0 2px 5px rgb(31 42 37 / 24%); }
+      .app-bar strong { font-size: 18px; font-weight: 600; }
+      .menu-icon { width: 22px; height: 14px; border-block: 2px solid currentColor; position: relative; }
+      .menu-icon::after { content: ""; position: absolute; top: 4px; width: 22px; border-top: 2px solid currentColor; }
+      main { padding: 24px; }
+      .dashboard { display: grid; width: min(100%, 1040px); margin: 0 auto; grid-template-columns: minmax(0, 520px); justify-content: center; }
+      scheduled-climate-card { display: block; width: 100%; }
       ha-card { display: block; background: var(--card-background-color); box-shadow: 0 2px 10px rgb(31 42 37 / 12%); }
       ha-icon { display: inline-block; width: 20px; height: 20px; }
-      @media (max-width: 540px) { body { padding: 10px; } }
+      .dialog { width: min(100%, 620px); margin: 24px auto; overflow: hidden; background: #fff; border-radius: 8px; box-shadow: 0 10px 32px rgb(31 42 37 / 22%); }
+      .dialog-header { padding: 20px 24px 14px; border-bottom: 1px solid var(--divider-color); }
+      .dialog-header h1 { margin: 0; font-size: 22px; font-weight: 500; letter-spacing: 0; }
+      .dialog-body { display: grid; gap: 18px; padding: 22px 24px 24px; }
+      .dialog-body > p { margin: -4px 0 2px; color: var(--secondary-text-color); font-size: 14px; }
+      .ha-field { display: grid; gap: 7px; font-size: 14px; }
+      .ha-field input, .ha-field select { width: 100%; min-height: 46px; padding: 9px 12px; color: var(--primary-text-color); background: #fff; border: 1px solid #87928c; border-radius: 4px; font: inherit; }
+      .ha-toggle { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 42px; font-size: 14px; }
+      .ha-toggle input { width: 20px; height: 20px; accent-color: var(--primary-color); }
+      .dialog-actions { display: flex; justify-content: flex-end; gap: 8px; padding: 8px 16px 16px; }
+      .dialog-actions button { min-height: 40px; padding: 8px 16px; border: 0; border-radius: 4px; color: var(--primary-color); background: transparent; font: inherit; font-weight: 600; text-transform: uppercase; }
+      .dialog-actions .primary { color: #fff; background: var(--primary-color); }
+      .editor-layout { display: grid; width: min(100%, 980px); margin: 0 auto; grid-template-columns: minmax(280px, 380px) minmax(340px, 520px); gap: 20px; align-items: start; }
+      .editor-panel { padding: 20px; background: #fff; border-radius: 8px; box-shadow: 0 2px 10px rgb(31 42 37 / 12%); }
+      .editor-panel h1 { margin: 0 0 18px; font-size: 20px; font-weight: 500; letter-spacing: 0; }
+      @media (max-width: 720px) {
+        main { padding: 10px; }
+        .app-bar { padding-inline: 14px; }
+        .editor-layout { grid-template-columns: 1fr; }
+        .dialog { margin-block: 10px; }
+      }
     </style>
   </head>
   <body>
-    <scheduled-climate-card id="card"></scheduled-climate-card>
+    <div class="app-bar"><span class="menu-icon" aria-hidden="true"></span><strong id="page-title">Home</strong></div>
+    <main id="root"></main>
     <script type="module">
       import "./src/scheduled-climate-card.ts";
 
       const calls = [];
-      const card = document.querySelector("#card");
-      card.setConfig({
-        type: "custom:scheduled-climate-card",
-        entity: "climate.living_room_scheduled",
-        timer_presets: [15, 30, 60, 120],
-      });
-      card.hass = {
-        states: {
-          "climate.living_room_scheduled": {
-            entity_id: "climate.living_room_scheduled",
-            state: "heat",
-            attributes: {
-              friendly_name: "Living room",
-              current_temperature: 20.5,
-              target_temp_low: 19,
-              target_temp_high: 23,
-              unit_of_measurement: "°C",
-              min_temp: 7,
-              max_temp: 35,
-              target_temp_step: 0.5,
-              hvac_action: "heating",
-              hvac_modes: ["off", "heat", "cool", "auto"],
-              preset_mode: "home",
-              preset_modes: ["home", "away", "eco"],
-              fan_mode: "auto",
-              fan_modes: ["auto", "low", "high"],
-              swing_mode: "off",
-              swing_modes: ["off", "vertical"],
-              swing_horizontal_mode: "off",
-              swing_horizontal_modes: ["off", "on"],
-              current_humidity: 43,
-              humidity: 45,
-              min_humidity: 30,
-              max_humidity: 70,
-              schedule_enabled: true,
-              schedule_on_time: "06:30:00",
-              schedule_off_time: "22:00:00",
-              next_schedule_action: "off",
-              next_schedule_time: "2026-08-03T22:00:00-04:00",
-              timer_action: "off",
-              timer_deadline: "2026-08-03T18:15:00Z",
-            },
-          },
-        },
-        callService: async (...args) => { calls.push(args); },
+      const entityId = "climate.living_room_scheduled";
+      const scenario = new URLSearchParams(location.search).get("scenario") ?? "standard";
+      const root = document.querySelector("#root");
+      const title = document.querySelector("#page-title");
+      const schedule = {
+        id: "living_room_weekly",
+        name: "Living room weekly",
+        monday: [
+          { from: "06:30:00", to: "08:30:00", data: { hvac_mode: "heat", target_temp_low: 20, target_temp_high: 23 } },
+          { from: "17:00:00", to: "22:30:00", data: { hvac_mode: "heat", target_temp_low: 19, target_temp_high: 22, fan_mode: "auto" } },
+        ],
+        tuesday: [{ from: "06:30:00", to: "08:30:00", data: { hvac_mode: "heat", target_temp_low: 20, target_temp_high: 23 } }],
       };
+      const state = {
+        entity_id: entityId,
+        state: "heat",
+        attributes: {
+          friendly_name: "Living room",
+          current_temperature: 20.5,
+          target_temp_low: 19,
+          target_temp_high: 23,
+          unit_of_measurement: "°C",
+          min_temp: 7,
+          max_temp: 35,
+          target_temp_step: 0.5,
+          supported_features: 15,
+          hvac_action: "heating",
+          hvac_modes: ["off", "heat", "cool", "auto"],
+          preset_mode: "home",
+          preset_modes: ["home", "away", "eco"],
+          fan_mode: "auto",
+          fan_modes: ["auto", "low", "high"],
+          swing_mode: "off",
+          swing_modes: ["off", "vertical"],
+          swing_horizontal_mode: "off",
+          swing_horizontal_modes: ["off", "on"],
+          current_humidity: 43,
+          humidity: 45,
+          min_humidity: 30,
+          max_humidity: 70,
+          schedule_enabled: true,
+          schedule_entity_id: "schedule.living_room_weekly",
+          schedule_id: schedule.id,
+          schedule_active: true,
+          next_schedule_event: "2026-08-10T22:30:00-04:00",
+          timer_action: "off",
+          timer_deadline: "2026-08-10T22:00:00-04:00",
+        },
+      };
+      const hass = {
+        states: {
+          [entityId]: state,
+        },
+        user: { is_admin: true },
+        callService: async (...args) => { calls.push(args); },
+        callWS: async (message) => message.type === "schedule/list" ? [schedule] : schedule,
+      };
+
+      const renderCard = async (layout = "standard") => {
+        title.textContent = "Climate";
+        root.innerHTML = '<div class="dashboard"><scheduled-climate-card id="card"></scheduled-climate-card></div>';
+        const card = document.querySelector("#card");
+        card.setConfig({
+          type: "custom:scheduled-climate-card",
+          entity: entityId,
+          layout,
+          default_schedule_day: "monday",
+          timer_presets: [15, 30, 60, 120],
+        });
+        card.hass = hass;
+        await card.updateComplete;
+        await new Promise((resolve) => setTimeout(resolve, 50));
+        await card.updateComplete;
+        return card;
+      };
+
+      if (scenario === "integration-setup") {
+        title.textContent = "Add integration";
+        root.innerHTML = `
+          <section class="dialog" aria-label="Add Scheduled Climate">
+            <div class="dialog-header"><h1>Add Scheduled Climate</h1></div>
+            <div class="dialog-body">
+              <p>Select the climate entity to control.</p>
+              <label class="ha-field">Name<input value="Living room" /></label>
+              <label class="ha-field">Climate entity<select><option>Living Room Thermostat</option></select></label>
+            </div>
+            <div class="dialog-actions"><button>Cancel</button><button class="primary">Submit</button></div>
+          </section>`;
+      } else if (scenario === "schedule-settings") {
+        title.textContent = "Scheduled Climate options";
+        root.innerHTML = `
+          <section class="dialog" aria-label="Schedule settings">
+            <div class="dialog-header"><h1>Schedule</h1></div>
+            <div class="dialog-body">
+              <p>Link a schedule helper and choose how its blocks are applied.</p>
+              <label class="ha-field">Schedule helper<select><option>Living room weekly</option></select></label>
+              <label class="ha-toggle"><span>Apply the schedule</span><input type="checkbox" checked /></label>
+              <label class="ha-field">Default on mode<select><option>Heat</option></select></label>
+              <label class="ha-field">When no block is active<select><option>Turn the climate entity off</option></select></label>
+              <label class="ha-toggle"><span>Apply the active block on startup</span><input type="checkbox" checked /></label>
+            </div>
+            <div class="dialog-actions"><button>Cancel</button><button class="primary">Submit</button></div>
+          </section>`;
+      } else if (scenario === "card-editor") {
+        title.textContent = "Edit card";
+        root.innerHTML = `
+          <div class="editor-layout">
+            <section class="editor-panel"><h1>Scheduled Climate Card</h1><scheduled-climate-card-editor id="editor"></scheduled-climate-card-editor></section>
+            <scheduled-climate-card id="card"></scheduled-climate-card>
+          </div>`;
+        const config = { type: "custom:scheduled-climate-card", entity: entityId, layout: "compact", default_schedule_day: "monday", timer_presets: [15, 30, 60, 120] };
+        const editor = document.querySelector("#editor");
+        const card = document.querySelector("#card");
+        editor.setConfig(config);
+        editor.hass = hass;
+        card.setConfig(config);
+        card.hass = hass;
+      } else {
+        const card = await renderCard(scenario === "compact" ? "compact" : "standard");
+        if (scenario === "schedule-editor") {
+          const addButton = [...card.shadowRoot.querySelectorAll("button")].find((button) => button.textContent.trim() === "Add block");
+          addButton?.click();
+          await card.updateComplete;
+        }
+      }
       window.harnessCalls = calls;
     </script>
   </body>

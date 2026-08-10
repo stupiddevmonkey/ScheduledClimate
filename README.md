@@ -4,6 +4,20 @@ Scheduled Climate is a Home Assistant custom integration that wraps an existing 
 
 Requires Home Assistant 2026.1 or newer. Local integration branding is available on Home Assistant 2026.3 or newer.
 
+## Showcase
+
+| Full climate and schedule controls | Compact card and visual editor |
+| --- | --- |
+| <img src="docs/images/dashboard-standard.png" alt="Scheduled Climate standard dashboard card" width="560"> | <img src="docs/images/card-editor.png" alt="Scheduled Climate visual card editor with compact preview" width="560"> |
+
+Edit weekly blocks from the dashboard, including HVAC mode, temperature or range setpoints, fan mode, and humidity:
+
+<p align="center">
+  <img src="docs/images/schedule-editor.png" alt="Scheduled Climate weekly schedule block editor" width="620">
+</p>
+
+See the **[complete user guide](docs/USER_GUIDE.md)** for installation, configuration screenshots, card options, schedule behavior, timer automations, permissions, migration, diagnostics, and troubleshooting.
+
 ## Installation
 
 1. Add this repository to HACS as a custom integration.
@@ -11,6 +25,8 @@ Requires Home Assistant 2026.1 or newer. Local integration branding is available
 3. Open **Settings > Devices & services > Add integration**, select **Scheduled Climate**, and choose the climate entity to wrap.
 
 The integration serves and registers its dashboard card automatically. A separate frontend download or Lovelace resource is not required.
+
+![Add Scheduled Climate configuration flow](docs/images/integration-setup.png)
 
 ## Dashboard Card
 
@@ -37,6 +53,8 @@ The card derives all schedule and timer state from the wrapper entity. It displa
 The `layout` option accepts `standard` (the default) or `compact`. Compact layout removes the circular temperature dial while retaining touch-friendly temperature and HVAC controls. Preset and climate options, the schedule, and the timer can each be collapsed; their states are retained per entity in the current browser.
 
 Set `schedule_editable: false` to render the schedule read-only. Editing is always read-only for non-administrators, because the schedule helper websocket API requires administrator rights. `default_schedule_day` selects the day shown first; the current day is used when it is omitted.
+
+![Compact Scheduled Climate dashboard card](docs/images/dashboard-compact-mobile.png)
 
 ## Weekly Schedule
 
