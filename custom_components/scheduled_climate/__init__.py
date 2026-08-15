@@ -5,6 +5,8 @@ import logging
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers import config_validation as cv
+from homeassistant.helpers.typing import ConfigType
 
 from .const import (
     CONF_APPLY_ON_START,
@@ -21,10 +23,18 @@ from .schedule import ScheduleManager
 
 _LOGGER = logging.getLogger(__name__)
 
+CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
+
 PLATFORMS = (Platform.CLIMATE,)
 
 LEGACY_ON_TIME = "on_time"
 LEGACY_OFF_TIME = "off_time"
+
+
+async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
+    """Publish the dashboard card as soon as the component loads."""
+    await async_register_frontend(hass)
+    return True
 
 
 async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:

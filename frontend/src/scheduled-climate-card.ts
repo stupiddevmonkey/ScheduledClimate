@@ -888,11 +888,17 @@ export class ScheduledClimateCard extends LitElement {
   `;
 }
 
-customElements.define("scheduled-climate-card", ScheduledClimateCard);
+// A second copy of this bundle (stale dashboard resource, cached module) must not
+// throw on load, otherwise the surviving registration is lost with it.
+if (!customElements.get("scheduled-climate-card")) {
+  customElements.define("scheduled-climate-card", ScheduledClimateCard);
+}
 window.customCards = window.customCards ?? [];
-window.customCards.push({
-  type: "scheduled-climate-card",
-  name: "Scheduled Climate Card",
-  description: "Climate controls with daily schedules and one-shot timers.",
-  preview: true,
-});
+if (!window.customCards.some((card) => card.type === "scheduled-climate-card")) {
+  window.customCards.push({
+    type: "scheduled-climate-card",
+    name: "Scheduled Climate Card",
+    description: "Climate controls with daily schedules and one-shot timers.",
+    preview: true,
+  });
+}

@@ -177,4 +177,6 @@ export class ScheduledClimateCardEditor extends LitElement {
   `;
 }
 
-customElements.define("scheduled-climate-card-editor", ScheduledClimateCardEditor);
+if (!customElements.get("scheduled-climate-card-editor")) {
+  customElements.define("scheduled-climate-card-editor", ScheduledClimateCardEditor);
+}

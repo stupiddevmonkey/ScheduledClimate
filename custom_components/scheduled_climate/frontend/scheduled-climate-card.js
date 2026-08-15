@@ -754,7 +754,7 @@ B.properties = {
     }
   `;
 let J = B;
-customElements.define("scheduled-climate-card-editor", J);
+customElements.get("scheduled-climate-card-editor") || customElements.define("scheduled-climate-card-editor", J);
 const Ye = /* @__PURE__ */ new Set(["unavailable", "unknown"]), Ze = "scheduled-climate-card:collapsed", I = class I extends A {
   constructor() {
     super(...arguments), this._busy = !1, this._message = "", this._timerMinutes = 30, this._selectedDay = ue(), this._scheduleError = "", this._loadedScheduleId = "", this._collapsed = {
@@ -1423,9 +1423,9 @@ I.properties = {
     }
   `;
 let Y = I;
-customElements.define("scheduled-climate-card", Y);
+customElements.get("scheduled-climate-card") || customElements.define("scheduled-climate-card", Y);
 window.customCards = window.customCards ?? [];
-window.customCards.push({
+window.customCards.some((r) => r.type === "scheduled-climate-card") || window.customCards.push({
   type: "scheduled-climate-card",
   name: "Scheduled Climate Card",
   description: "Climate controls with daily schedules and one-shot timers.",
