@@ -16,6 +16,8 @@ SERVICE_START_ON_TIMER = "start_on_timer"
 SERVICE_START_OFF_TIMER = "start_off_timer"
 SERVICE_CANCEL_TIMER = "cancel_timer"
 SERVICE_LINK_SCHEDULE = "link_schedule"
+SERVICE_ENABLE_SCHEDULE = "enable_schedule"
+SERVICE_DISABLE_SCHEDULE = "disable_schedule"
 
 ATTR_DURATION = "duration"
 ATTR_SCHEDULE_ID = "schedule_id"

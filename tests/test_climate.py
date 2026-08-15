@@ -51,6 +51,8 @@ from custom_components.scheduled_climate.const import (
     CONF_TARGET_ENTITY_ID,
     DOMAIN,
     SERVICE_CANCEL_TIMER,
+    SERVICE_DISABLE_SCHEDULE,
+    SERVICE_ENABLE_SCHEDULE,
     SERVICE_LINK_SCHEDULE,
     SERVICE_START_OFF_TIMER,
     SERVICE_START_ON_TIMER,
@@ -402,6 +404,84 @@ async def test_link_schedule_rejects_unknown_schedule(hass: HomeAssistant) -> No
 
     with pytest.raises(ServiceValidationError):
         await entity.async_link_schedule("missing")
+
+    assert entry.options == {}
+
+
+async def test_enable_schedule_service(hass: HomeAssistant) -> None:
+    """Test enabling the schedule updates the option and applies the active block."""
+    await _setup_schedule_helper(hass)
+    wrapper_entity_id = await _setup_wrapper(
+        hass,
+        {
+            CONF_SCHEDULE_ENTITY_ID: "schedule.office",
+            CONF_SCHEDULE_ENABLED: False,
+        },
+    )
+    entry = hass.config_entries.async_entries(DOMAIN)[0]
+
+    await hass.services.async_call(
+        DOMAIN,
+        SERVICE_ENABLE_SCHEDULE,
+        {ATTR_ENTITY_ID: wrapper_entity_id},
+        blocking=True,
+    )
+    await hass.async_block_till_done()
+
+    assert entry.options[CONF_SCHEDULE_ENABLED] is True
+    state = hass.states.get(wrapper_entity_id)
+    assert state is not None
+    assert state.attributes[ATTR_SCHEDULE_ENABLED] is True
+
+
+async def test_disable_schedule_service(hass: HomeAssistant) -> None:
+    """Test disabling the schedule keeps the helper linked but pauses application."""
+    await _setup_schedule_helper(hass)
+    wrapper_entity_id = await _setup_wrapper(
+        hass,
+        {
+            CONF_SCHEDULE_ENTITY_ID: "schedule.office",
+            CONF_SCHEDULE_ENABLED: True,
+        },
+    )
+    entry = hass.config_entries.async_entries(DOMAIN)[0]
+
+    await hass.services.async_call(
+        DOMAIN,
+        SERVICE_DISABLE_SCHEDULE,
+        {ATTR_ENTITY_ID: wrapper_entity_id},
+        blocking=True,
+    )
+    await hass.async_block_till_done()
+
+    assert entry.options[CONF_SCHEDULE_ENABLED] is False
+    assert entry.options[CONF_SCHEDULE_ENTITY_ID] == "schedule.office"
+    state = hass.states.get(wrapper_entity_id)
+    assert state is not None
+    assert state.attributes[ATTR_SCHEDULE_ENABLED] is False
+    assert state.attributes[ATTR_SCHEDULE_ENTITY_ID] == "schedule.office"
+
+
+async def test_enable_schedule_rejects_when_no_schedule_linked(
+    hass: HomeAssistant,
+) -> None:
+    """Test enabling the schedule is rejected when no helper is linked."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        version=2,
+        data={CONF_TARGET_ENTITY_ID: TARGET_ENTITY_ID},
+    )
+    entry.add_to_hass(hass)
+    entity = ScheduledClimateEntity(
+        entry.entry_id,
+        "Living Room",
+        TARGET_ENTITY_ID,
+        ScheduleManager(hass, entry),
+    )
+    entity.hass = hass
+
+    with pytest.raises(ServiceValidationError, match="no schedule helper is linked"):
+        await entity.async_enable_schedule()
 
     assert entry.options == {}
 

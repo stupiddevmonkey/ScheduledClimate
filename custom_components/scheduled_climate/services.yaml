@@ -50,3 +50,19 @@ link_schedule:
       required: false
       selector:
         text:
+
+enable_schedule:
+  name: Enable schedule
+  description: Resumes applying the linked schedule to the climate entity.
+  target:
+    entity:
+      integration: scheduled_climate
+      domain: climate
+
+disable_schedule:
+  name: Disable schedule
+  description: Pauses the linked schedule without unlinking it. The schedule can be re-enabled later.
+  target:
+    entity:
+      integration: scheduled_climate
+      domain: climate

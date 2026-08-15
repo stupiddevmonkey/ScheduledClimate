@@ -1053,15 +1053,29 @@ const Ye = /* @__PURE__ */ new Set(["unavailable", "unknown"]), Ze = "scheduled-
     `;
   }
   _renderSchedule(e) {
-    const t = e.attributes.next_schedule_event, i = e.attributes.schedule_id, s = i ? t ? `Next change · ${new Date(t).toLocaleString()}` : e.attributes.schedule_enabled ? "No upcoming change" : "Schedule paused" : "No schedule linked";
+    const t = e.attributes.next_schedule_event, i = e.attributes.schedule_id, s = e.attributes.schedule_enabled, a = i ? t ? `Next change · ${new Date(t).toLocaleString()}` : s ? "No upcoming change" : "Schedule paused" : "No schedule linked";
     return l`
       <section aria-labelledby="schedule-heading">
         <div class="section-heading">
           <ha-icon class="section-icon" icon="mdi:calendar-clock"></ha-icon>
           <div class="section-copy">
             <h3 id="schedule-heading">Schedule</h3>
-            <p>${s}</p>
+            <p>${a}</p>
           </div>
+          ${i ? l`<button
+                class="icon"
+                title=${s ? "Pause schedule" : "Resume schedule"}
+                aria-label=${s ? "Pause schedule" : "Resume schedule"}
+                ?disabled=${this._busy}
+                @click=${() => this._call(
+      "scheduled_climate",
+      s ? "disable_schedule" : "enable_schedule"
+    )}
+              >
+                <ha-icon
+                  icon=${s ? "mdi:pause" : "mdi:play"}
+                ></ha-icon>
+              </button>` : d}
           ${this._renderCollapseButton("schedule", "Schedule", "schedule-controls")}
         </div>
         <div id="schedule-controls" class="collapsible-body" ?hidden=${this._collapsed.schedule}>

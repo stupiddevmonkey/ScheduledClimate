@@ -91,6 +91,8 @@ from .const import (
     CONF_TARGET_ENTITY_ID,
     DOMAIN,
     SERVICE_CANCEL_TIMER,
+    SERVICE_DISABLE_SCHEDULE,
+    SERVICE_ENABLE_SCHEDULE,
     SERVICE_LINK_SCHEDULE,
     SERVICE_START_OFF_TIMER,
     SERVICE_START_ON_TIMER,
@@ -158,6 +160,16 @@ async def async_setup_entry(
         SERVICE_LINK_SCHEDULE,
         {vol.Optional(ATTR_SCHEDULE_ID): vol.Any(None, cv.string)},
         "async_link_schedule",
+    )
+    platform.async_register_entity_service(
+        SERVICE_ENABLE_SCHEDULE,
+        None,
+        "async_enable_schedule",
+    )
+    platform.async_register_entity_service(
+        SERVICE_DISABLE_SCHEDULE,
+        None,
+        "async_disable_schedule",
     )
 
 
@@ -350,6 +362,28 @@ class ScheduledClimateEntity(ClimateEntity):
             options[CONF_SCHEDULE_ENABLED] = False
 
         self.hass.config_entries.async_update_entry(entry, options=options)
+
+    async def async_enable_schedule(self) -> None:
+        """Enable the linked schedule without changing which schedule is linked."""
+        entry = self.hass.config_entries.async_get_entry(self._attr_unique_id)
+        if entry is None:
+            raise ServiceValidationError("Config entry is no longer available")
+        if not entry.options.get(CONF_SCHEDULE_ENTITY_ID):
+            raise ServiceValidationError(
+                "Cannot enable the schedule: no schedule helper is linked"
+            )
+        self.hass.config_entries.async_update_entry(
+            entry, options={**entry.options, CONF_SCHEDULE_ENABLED: True}
+        )
+
+    async def async_disable_schedule(self) -> None:
+        """Disable the linked schedule without unlinking it."""
+        entry = self.hass.config_entries.async_get_entry(self._attr_unique_id)
+        if entry is None:
+            raise ServiceValidationError("Config entry is no longer available")
+        self.hass.config_entries.async_update_entry(
+            entry, options={**entry.options, CONF_SCHEDULE_ENABLED: False}
+        )
 
     @property
     def hvac_mode(self) -> HVACMode | None:

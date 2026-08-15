@@ -446,11 +446,12 @@ export class ScheduledClimateCard extends LitElement {
   private _renderSchedule(state: HassEntity) {
     const nextEvent = state.attributes.next_schedule_event;
     const scheduleId = state.attributes.schedule_id;
+    const scheduleEnabled = state.attributes.schedule_enabled;
     const caption = !scheduleId
       ? "No schedule linked"
       : nextEvent
         ? `Next change · ${new Date(nextEvent).toLocaleString()}`
-        : state.attributes.schedule_enabled
+        : scheduleEnabled
           ? "No upcoming change"
           : "Schedule paused";
 
@@ -462,6 +463,23 @@ export class ScheduledClimateCard extends LitElement {
             <h3 id="schedule-heading">Schedule</h3>
             <p>${caption}</p>
           </div>
+          ${scheduleId
+            ? html`<button
+                class="icon"
+                title=${scheduleEnabled ? "Pause schedule" : "Resume schedule"}
+                aria-label=${scheduleEnabled ? "Pause schedule" : "Resume schedule"}
+                ?disabled=${this._busy}
+                @click=${() =>
+                  this._call(
+                    "scheduled_climate",
+                    scheduleEnabled ? "disable_schedule" : "enable_schedule",
+                  )}
+              >
+                <ha-icon
+                  icon=${scheduleEnabled ? "mdi:pause" : "mdi:play"}
+                ></ha-icon>
+              </button>`
+            : nothing}
           ${this._renderCollapseButton("schedule", "Schedule", "schedule-controls")}
         </div>
         <div id="schedule-controls" class="collapsible-body" ?hidden=${this._collapsed.schedule}>
