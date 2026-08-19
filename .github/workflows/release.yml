@@ -65,12 +65,11 @@ jobs:
           npm test
         working-directory: frontend
 
-      - name: Write version into source files
+      - name: Write version into manifest.json and pyproject.toml
         env:
           VERSION: ${{ inputs.tag }}
         run: |
           V="${VERSION#v}"
-          # manifest.json
           python - <<EOF
           import json, pathlib
           p = pathlib.Path("custom_components/scheduled_climate/manifest.json")
@@ -78,11 +77,13 @@ jobs:
           d["version"] = "$V"
           p.write_text(json.dumps(d, indent=2) + "\n")
           EOF
-          # pyproject.toml
           sed -i "s/^version = \".*\"/version = \"$V\"/" pyproject.toml
-          # package.json and package-lock.json
-          npm version "$V" --no-git-tag-version --workspaces false
-        working-directory: .
+
+      - name: Write version into frontend package.json
+        env:
+          VERSION: ${{ inputs.tag }}
+        run: npm version "${VERSION#v}" --no-git-tag-version
+        working-directory: frontend
 
       - name: Regenerate Python package metadata
         run: python -m pip install --no-deps --editable . -q
