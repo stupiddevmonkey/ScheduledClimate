@@ -1,14 +1,22 @@
 {
   "domain": "scheduled_climate",
   "name": "Scheduled Climate",
-  "after_dependencies": ["frontend", "lovelace"],
-  "codeowners": ["@stupiddevmonkey"],
+  "after_dependencies": [
+    "frontend",
+    "lovelace"
+  ],
+  "codeowners": [
+    "@stupiddevmonkey"
+  ],
   "config_flow": true,
-  "dependencies": ["http", "schedule"],
+  "dependencies": [
+    "http",
+    "schedule"
+  ],
   "documentation": "https://github.com/stupiddevmonkey/ScheduledClimate",
   "integration_type": "service",
   "iot_class": "calculated",
   "issue_tracker": "https://github.com/stupiddevmonkey/ScheduledClimate/issues",
   "requirements": [],
-  "version": "1.1.0"
+  "version": "1.1.1"
 }
