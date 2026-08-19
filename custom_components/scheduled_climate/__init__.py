@@ -18,7 +18,7 @@ from .const import (
     DEFAULT_OFF_BEHAVIOR,
     DOMAIN,
 )
-from .frontend import async_register_frontend
+from .frontend import async_register_frontend, async_unregister_resource
 from .schedule import ScheduleManager
 
 _LOGGER = logging.getLogger(__name__)
@@ -81,6 +81,17 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     manager: ScheduleManager = hass.data[DOMAIN].pop(entry.entry_id)
     manager.async_shutdown()
     return True
+
+
+async def async_remove_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """Remove the dashboard resource once the last config entry is gone."""
+    other_entries = [
+        candidate
+        for candidate in hass.config_entries.async_entries(DOMAIN)
+        if candidate.entry_id != entry.entry_id
+    ]
+    if not other_entries:
+        await async_unregister_resource(hass)
 
 
 async def async_reload_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:

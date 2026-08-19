@@ -2,29 +2,29 @@
 
 import asyncio
 import logging
-from collections.abc import Callable
 from hashlib import sha256
 from pathlib import Path
 
 from homeassistant.components.frontend import DATA_EXTRA_MODULE_URL, add_extra_js_url
 from homeassistant.components.http import StaticPathConfig
-from homeassistant.const import EVENT_COMPONENT_LOADED
-from homeassistant.core import Event, HomeAssistant, callback
-from homeassistant.setup import ATTR_COMPONENT
+from homeassistant.components.lovelace.const import (
+    CONF_RESOURCE_TYPE_WS,
+    LOVELACE_DATA,
+)
+from homeassistant.components.lovelace.resources import ResourceStorageCollection
+from homeassistant.const import CONF_ID, CONF_URL
+from homeassistant.core import HomeAssistant
 
 from .const import DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 
-FRONTEND_DOMAIN = "frontend"
 CARD_FILENAME = "scheduled-climate-card.js"
 CARD_PATH = f"/{DOMAIN}/{CARD_FILENAME}"
 CARD_FILE = Path(__file__).parent / "frontend" / CARD_FILENAME
+RESOURCE_TYPE_MODULE = "module"
 
-CARD_URL_CACHE = f"{DOMAIN}_card_url"
 STATIC_PATH_REGISTERED = f"{DOMAIN}_static_path_registered"
-MODULE_URL_REGISTERED = f"{DOMAIN}_module_url_registered"
-MODULE_URL_DEFERRED = f"{DOMAIN}_module_url_deferred"
 FRONTEND_REGISTRATION_LOCK = f"{DOMAIN}_frontend_registration_lock"
 
 
@@ -33,63 +33,62 @@ def _build_card_url() -> str:
     return f"{CARD_PATH}?v={sha256(CARD_FILE.read_bytes()).hexdigest()[:8]}"
 
 
-async def async_card_url(hass: HomeAssistant) -> str:
-    """Return the cache-busted card URL, hashing the bundle only once."""
-    cached: str | None = hass.data.get(CARD_URL_CACHE)
-    if cached is None:
-        cached = await hass.async_add_executor_job(_build_card_url)
-        hass.data[CARD_URL_CACHE] = cached
-    return cached
-
-
 async def async_register_frontend(hass: HomeAssistant) -> None:
-    """Serve the packaged card and add it to the frontend module URLs.
+    """Serve the packaged card and register it as a dashboard resource.
 
-    Each step is tracked separately and retried on every call so a partial
-    registration recovers on the next setup or reload instead of leaving the
-    card unreachable until Home Assistant restarts.
+    The card is added through the same storage-backed Lovelace resource
+    mechanism used for resources added by hand from the UI. The frontend
+    reads that list from its own storage on every dashboard load, so the
+    card does not depend on this integration having already finished
+    setting up by the time a client loads a dashboard -- unlike the
+    in-memory extra module URL list, which left the card unreachable for
+    any client that connected in the window before this integration
+    finished registering it.
     """
-    if hass.data.get(STATIC_PATH_REGISTERED) and hass.data.get(MODULE_URL_REGISTERED):
-        return
-
     lock = hass.data.setdefault(FRONTEND_REGISTRATION_LOCK, asyncio.Lock())
     async with lock:
-        card_url = await async_card_url(hass)
-
         if not hass.data.get(STATIC_PATH_REGISTERED):
             await hass.http.async_register_static_paths(
                 [StaticPathConfig(CARD_PATH, str(CARD_FILE), cache_headers=True)]
             )
             hass.data[STATIC_PATH_REGISTERED] = True
 
-        _async_add_module_url(hass, card_url)
+        card_url = await hass.async_add_executor_job(_build_card_url)
+        await _async_ensure_resource(hass, card_url)
 
 
-@callback
-def _async_add_module_url(hass: HomeAssistant, card_url: str) -> None:
-    """Publish the card URL to the frontend, waiting for it when necessary."""
-    if hass.data.get(MODULE_URL_REGISTERED):
+async def _async_ensure_resource(hass: HomeAssistant, card_url: str) -> None:
+    """Create or update the persisted Lovelace resource for the card."""
+    lovelace = hass.data.get(LOVELACE_DATA)
+    resources = lovelace.resources if lovelace else None
+    if not isinstance(resources, ResourceStorageCollection):
+        # YAML-mode Lovelace (or the lovelace component is not set up) has no
+        # storage collection to write to; fall back to the module URL list.
+        if DATA_EXTRA_MODULE_URL in hass.data:
+            add_extra_js_url(hass, card_url)
         return
 
-    if DATA_EXTRA_MODULE_URL in hass.data:
-        add_extra_js_url(hass, card_url)
-        hass.data[MODULE_URL_REGISTERED] = True
+    await resources.async_get_info()  # Ensures the collection is loaded.
+    for item in resources.async_items():
+        if not str(item.get(CONF_URL, "")).startswith(CARD_PATH):
+            continue
+        if item[CONF_URL] != card_url:
+            await resources.async_update_item(item[CONF_ID], {CONF_URL: card_url})
         return
 
-    if hass.data.get(MODULE_URL_DEFERRED):
+    await resources.async_create_item(
+        {CONF_RESOURCE_TYPE_WS: RESOURCE_TYPE_MODULE, CONF_URL: card_url}
+    )
+
+
+async def async_unregister_resource(hass: HomeAssistant) -> None:
+    """Remove the persisted Lovelace resource for the card."""
+    lovelace = hass.data.get(LOVELACE_DATA)
+    resources = lovelace.resources if lovelace else None
+    if not isinstance(resources, ResourceStorageCollection):
         return
 
-    unsub: Callable[[], None] | None = None
-
-    @callback
-    def _component_loaded(event: Event) -> None:
-        if event.data.get(ATTR_COMPONENT) != FRONTEND_DOMAIN:
-            return
-        if unsub is not None:
-            unsub()
-        hass.data[MODULE_URL_DEFERRED] = False
-        _async_add_module_url(hass, card_url)
-
-    hass.data[MODULE_URL_DEFERRED] = True
-    unsub = hass.bus.async_listen(EVENT_COMPONENT_LOADED, _component_loaded)
-    _LOGGER.debug("Frontend not loaded yet, deferring Scheduled Climate card")
+    await resources.async_get_info()
+    for item in list(resources.async_items()):
+        if str(item.get(CONF_URL, "")).startswith(CARD_PATH):
+            await resources.async_delete_item(item[CONF_ID])

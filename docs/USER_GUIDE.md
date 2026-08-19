@@ -231,3 +231,7 @@ logger:
 ```
 
 Restart Home Assistant after changing `configuration.yaml`, reproduce the issue, and include the relevant log entries and diagnostics in a bug report.
+
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md) for release history.

@@ -1,7 +1,7 @@
 {
   "domain": "scheduled_climate",
   "name": "Scheduled Climate",
-  "after_dependencies": ["frontend"],
+  "after_dependencies": ["frontend", "lovelace"],
   "codeowners": ["@stupiddevmonkey"],
   "config_flow": true,
   "dependencies": ["http", "schedule"],

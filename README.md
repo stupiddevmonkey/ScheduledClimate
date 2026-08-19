@@ -16,7 +16,7 @@ Edit weekly blocks from the dashboard, including HVAC mode, temperature or range
   <img src="docs/images/schedule-editor.png" alt="Scheduled Climate weekly schedule block editor" width="620">
 </p>
 
-See the **[complete user guide](docs/USER_GUIDE.md)** for installation, configuration screenshots, card options, schedule behavior, timer automations, permissions, migration, diagnostics, and troubleshooting.
+See the **[complete user guide](docs/USER_GUIDE.md)** for installation, configuration screenshots, card options, schedule behavior, timer automations, permissions, migration, diagnostics, and troubleshooting. See the **[changelog](docs/CHANGELOG.md)** for release history.
 
 ## Installation
 
