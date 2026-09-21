@@ -4,18 +4,17 @@
     "step": {
       "user": {
         "title": "Add Scheduled Climate",
-        "description": "Select the climate entity to control.",
+        "description": "A room can hold more than one climate entity. Pick the first one now; you can add more later from the integration options.",
         "data": {
-          "name": "Name",
+          "name": "Room name",
           "target_entity_id": "Climate entity"
         }
       },
       "reconfigure": {
         "title": "Reconfigure Scheduled Climate",
-        "description": "Select the climate entity to control.",
+        "description": "Rename the room. Its climate entities are managed from the integration options.",
         "data": {
-          "name": "Name",
-          "target_entity_id": "Climate entity"
+          "name": "Room name"
         }
       }
     },
@@ -28,20 +27,107 @@
   "options": {
     "step": {
       "init": {
-        "title": "Schedule",
-        "description": "Link a schedule helper and choose how its blocks are applied.",
+        "title": "Scheduled Climate",
+        "description": "Manage the climate entities, plans and schedules for this room.",
+        "menu_options": {
+          "add_target": "Add a climate entity",
+          "edit_target": "Edit a climate entity",
+          "add_plan": "Add a plan",
+          "edit_plan": "Edit a plan",
+          "link_schedule": "Link a schedule helper",
+          "plan_selection": "How the active plan is chosen",
+          "override": "Holds"
+        }
+      },
+      "add_target": {
+        "title": "Add a climate entity",
         "data": {
-          "schedule_entity_id": "Schedule helper",
+          "target_entity_id": "Climate entity",
+          "name": "Name"
+        }
+      },
+      "edit_target": {
+        "title": "Edit a climate entity",
+        "data": {
+          "target": "Climate entity to edit"
+        }
+      },
+      "target_options": {
+        "title": "Climate entity",
+        "data": {
+          "name": "Name",
+          "target_entity_id": "Climate entity",
           "schedule_enabled": "Apply the schedule",
           "default_hvac_mode": "Default on mode",
           "off_behavior": "When no block is active",
-          "apply_on_start": "Apply the active block on startup"
+          "apply_on_start": "Apply the active block on startup",
+          "remove": "Remove this climate entity from the room"
+        }
+      },
+      "add_plan": {
+        "title": "Add a plan",
+        "data": {
+          "name": "Plan name",
+          "icon": "Icon",
+          "min_outdoor_temp": "Activate at or above this outdoor temperature"
+        }
+      },
+      "edit_plan": {
+        "title": "Edit a plan",
+        "data": {
+          "plan": "Plan to edit"
+        }
+      },
+      "plan_options": {
+        "title": "Plan",
+        "data": {
+          "name": "Plan name",
+          "icon": "Icon",
+          "min_outdoor_temp": "Activate at or above this outdoor temperature",
+          "remove": "Delete this plan"
+        }
+      },
+      "link_schedule": {
+        "title": "Link a schedule helper",
+        "description": "Link a schedule helper to a climate entity for a plan. Clearing the helper unlinks it; the helper itself is never deleted.",
+        "data": {
+          "target": "Climate entity",
+          "plan": "Plan",
+          "schedule_entity_id": "Schedule helper"
+        }
+      },
+      "plan_selection": {
+        "title": "How the active plan is chosen",
+        "description": "A plan keeps its band until the reading leaves it by half the hysteresis, and the reading must hold for the sustain window before the plan switches.",
+        "data": {
+          "mode": "How the active plan is chosen",
+          "outdoor_temp_entity_id": "Outdoor temperature sensor",
+          "hysteresis": "Hysteresis",
+          "sustain_minutes": "Sustain the reading for"
+        }
+      },
+      "override": {
+        "title": "Holds",
+        "data": {
+          "default_minutes": "Default hold length",
+          "max_minutes": "Longest hold allowed"
         }
       }
     },
     "error": {
-      "schedule_entity_required": "Select a schedule helper before enabling the schedule",
-      "schedule_not_found": "The selected schedule helper does not exist"
+      "target_not_found": "The selected climate entity does not exist",
+      "target_is_scheduled_climate": "Select a climate entity that is not managed by Scheduled Climate",
+      "target_already_configured": "This climate entity is already configured",
+      "last_target": "A room needs at least one climate entity",
+      "plan_name_taken": "Another plan already uses that name",
+      "last_plan": "A room needs at least one plan",
+      "schedule_not_found": "The selected schedule helper does not exist",
+      "outdoor_sensor_required": "Select an outdoor temperature sensor to choose plans automatically",
+      "override_bounds": "The default hold must not be longer than the longest hold allowed"
+    },
+    "abort": {
+      "no_targets": "Add a climate entity to this room first",
+      "no_plans": "Add a plan to this room first"
     }
   },
   "issues": {
@@ -56,6 +142,14 @@
     "block_unsupported": {
       "title": "Schedule block cannot be applied",
       "description": "The active schedule block for {name} could not be fully applied: {issues}"
+    },
+    "outdoor_sensor_unavailable": {
+      "title": "Outdoor temperature sensor is unavailable",
+      "description": "{name} cannot read {entity_id}. The plan will not switch automatically until the sensor reports a number again, and the last plan stays in force."
+    },
+    "no_plans": {
+      "title": "Room has no plans",
+      "description": "{name} has no plans, so nothing is scheduled. Add a plan from the integration options."
     }
   },
   "selector": {
@@ -73,6 +167,22 @@
       "options": {
         "turn_off": "Turn the climate entity off",
         "ignore": "Leave the climate entity unchanged"
+      }
+    },
+    "plan_selection_mode": {
+      "options": {
+        "manual": "Choose the plan by hand",
+        "outdoor_temp": "Follow an outdoor temperature sensor"
+      }
+    }
+  },
+  "entity": {
+    "select": {
+      "schedule_plan": {
+        "name": "Schedule plan",
+        "state": {
+          "automatic": "Automatic"
+        }
       }
     }
   }

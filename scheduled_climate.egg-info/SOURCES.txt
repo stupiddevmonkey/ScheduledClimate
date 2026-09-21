@@ -13,7 +13,14 @@ scheduled_climate.egg-info/top_level.txt
 tests/test_block.py
 tests/test_climate.py
 tests/test_config_flow.py
+tests/test_coordinator.py
 tests/test_frontend.py
 tests/test_migration.py
+tests/test_models.py
+tests/test_override.py
+tests/test_override_manager.py
+tests/test_plan.py
+tests/test_plan_bands.py
 tests/test_schedule.py
 tests/test_timer.py
+tests/test_upgrade.py

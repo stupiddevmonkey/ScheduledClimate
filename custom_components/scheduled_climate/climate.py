@@ -1,9 +1,10 @@
-"""Scheduled Climate wrapper entity."""
+"""Scheduled Climate wrapper entities."""
 
 from __future__ import annotations
 
 from collections.abc import Callable
-from datetime import timedelta
+from dataclasses import replace
+from datetime import datetime, timedelta
 from typing import TYPE_CHECKING, Any
 
 import voluptuous as vol
@@ -64,8 +65,11 @@ from homeassistant.helpers.event import (
     async_track_entity_registry_updated_event,
     async_track_state_change_event,
 )
+from homeassistant.util import dt as dt_util
 
+from .block import ScheduleBlock
 from .const import (
+    ATTR_ACTIVE_PLAN,
     ATTR_ACTIVE_SCHEDULE_BLOCK,
     ATTR_DURATION,
     ATTR_LEGACY_SCHEDULE,
@@ -74,30 +78,53 @@ from .const import (
     ATTR_MIN_HUMIDITY,
     ATTR_MIN_TEMP,
     ATTR_NEXT_SCHEDULE_EVENT,
+    ATTR_OVERRIDE_ACTIVE,
+    ATTR_OVERRIDE_BLOCK,
+    ATTR_OVERRIDE_UNTIL,
+    ATTR_PLAN,
+    ATTR_PLAN_OPTIONS,
+    ATTR_PLAN_RESOLVED_AUTOMATICALLY,
+    ATTR_PLAN_SCHEDULES,
+    ATTR_PLAN_SELECTION_MODE,
+    ATTR_ROOM_ENTITIES,
     ATTR_SCHEDULE_ACTIVE,
     ATTR_SCHEDULE_ENABLED,
     ATTR_SCHEDULE_ENTITY_ID,
     ATTR_SCHEDULE_ID,
     ATTR_SCHEDULE_ISSUES,
     ATTR_TARGET_HUMIDITY_STEP,
+    ATTR_TARGET_KEY,
     ATTR_TARGET_TEMP_STEP,
     ATTR_TEMPERATURE_UNIT,
     ATTR_TIMER_ACTION,
     ATTR_TIMER_DEADLINE,
+    ATTR_UNTIL_NEXT_BLOCK,
     CONF_LEGACY_OFF_TIME,
     CONF_LEGACY_ON_TIME,
-    CONF_SCHEDULE_ENABLED,
-    CONF_SCHEDULE_ENTITY_ID,
-    CONF_TARGET_ENTITY_ID,
+    CONF_TARGETS,
+    DEFAULT_PLAN_NAME,
     DOMAIN,
     SERVICE_CANCEL_TIMER,
+    SERVICE_CLEAR_OVERRIDE,
     SERVICE_DISABLE_SCHEDULE,
     SERVICE_ENABLE_SCHEDULE,
     SERVICE_LINK_SCHEDULE,
+    SERVICE_SELECT_PLAN,
+    SERVICE_SET_OVERRIDE,
     SERVICE_START_OFF_TIMER,
     SERVICE_START_ON_TIMER,
 )
-from .schedule import ScheduleManager, async_resolve_schedule_entity_id
+from .coordinator import RoomCoordinator
+from .entity import room_device_info
+from .models import (
+    PlanConfig,
+    TargetConfig,
+    new_key,
+    options_from_config,
+    options_with_behavior,
+    targets_as_data,
+)
+from .schedule import TargetController, async_resolve_schedule_entity_id
 
 if TYPE_CHECKING:
     from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
@@ -108,32 +135,34 @@ async def async_setup_entry(
     entry: ConfigEntry,
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
-    """Set up a Scheduled Climate entity."""
-    manager: ScheduleManager = hass.data[DOMAIN][entry.entry_id]
-    target_entity_id: str = entry.data[CONF_TARGET_ENTITY_ID]
+    """Set up one Scheduled Climate entity per target in the room."""
+    coordinator: RoomCoordinator = hass.data[DOMAIN][entry.entry_id]
     registry = er.async_get(hass)
-    wrapper_entity_id = registry.async_get_entity_id(
-        CLIMATE_DOMAIN, DOMAIN, entry.entry_id
-    )
-    if wrapper_entity_id is not None and wrapper_entity_id == target_entity_id:
-        target_object_id = target_entity_id.split(".", 1)[-1]
-        registry.async_update_entity(
-            wrapper_entity_id,
-            new_entity_id=registry.async_generate_entity_id(
-                CLIMATE_DOMAIN,
-                f"{target_object_id}_scheduled",
-            ),
+
+    entities: list[ScheduledClimateEntity] = []
+    for controller in coordinator:
+        target = controller.target
+        wrapper_entity_id = registry.async_get_entity_id(
+            CLIMATE_DOMAIN, DOMAIN, target.key
         )
-    async_add_entities(
-        [
-            ScheduledClimateEntity(
-                entry.entry_id,
-                entry.title,
-                target_entity_id,
-                manager,
+        if wrapper_entity_id is not None and wrapper_entity_id == target.entity_id:
+            target_object_id = target.entity_id.split(".", 1)[-1]
+            registry.async_update_entity(
+                wrapper_entity_id,
+                new_entity_id=registry.async_generate_entity_id(
+                    CLIMATE_DOMAIN,
+                    f"{target_object_id}_scheduled",
+                ),
             )
-        ]
-    )
+        entities.append(ScheduledClimateEntity(entry, coordinator, controller))
+
+    async_add_entities(entities)
+    _async_register_services()
+
+
+@callback
+def _async_register_services() -> None:
+    """Register the entity services exposed by this platform."""
     platform = entity_platform.async_get_current_platform()
     timer_schema = {
         vol.Required(ATTR_DURATION): vol.All(
@@ -158,7 +187,10 @@ async def async_setup_entry(
     )
     platform.async_register_entity_service(
         SERVICE_LINK_SCHEDULE,
-        {vol.Optional(ATTR_SCHEDULE_ID): vol.Any(None, cv.string)},
+        {
+            vol.Optional(ATTR_SCHEDULE_ID): vol.Any(None, cv.string),
+            vol.Optional(ATTR_PLAN): cv.string,
+        },
         "async_link_schedule",
     )
     platform.async_register_entity_service(
@@ -171,30 +203,58 @@ async def async_setup_entry(
         None,
         "async_disable_schedule",
     )
+    platform.async_register_entity_service(
+        SERVICE_SET_OVERRIDE,
+        {
+            vol.Optional(ATTR_UNTIL_NEXT_BLOCK): cv.boolean,
+            vol.Optional(ATTR_DURATION): vol.All(
+                cv.time_period,
+                vol.Range(min=timedelta.resolution),
+            ),
+            vol.Optional(ATTR_HVAC_MODE): vol.Coerce(HVACMode),
+            vol.Optional(ATTR_TEMPERATURE): vol.Coerce(float),
+            vol.Optional(ATTR_TARGET_TEMP_LOW): vol.Coerce(float),
+            vol.Optional(ATTR_TARGET_TEMP_HIGH): vol.Coerce(float),
+            vol.Optional(ATTR_FAN_MODE): cv.string,
+            vol.Optional(ATTR_HUMIDITY): vol.Coerce(float),
+        },
+        "async_set_override",
+    )
+    platform.async_register_entity_service(
+        SERVICE_CLEAR_OVERRIDE,
+        None,
+        "async_clear_override",
+    )
+    platform.async_register_entity_service(
+        SERVICE_SELECT_PLAN,
+        {vol.Required(ATTR_PLAN): cv.string},
+        "async_select_plan",
+    )
 
 
 class ScheduledClimateEntity(ClimateEntity):
-    """Mirror and control an existing climate entity."""
+    """Mirror and control one existing climate entity in a room."""
 
     _attr_has_entity_name = True
     _attr_should_poll = False
-    _attr_name = None
 
     def __init__(
         self,
-        entry_id: str,
-        name: str,
-        target_entity_id: str,
-        schedule_manager: ScheduleManager,
+        entry: ConfigEntry,
+        coordinator: RoomCoordinator,
+        controller: TargetController,
     ) -> None:
         """Initialize the wrapper."""
-        self._attr_unique_id = entry_id
-        self._attr_device_info = {
-            "identifiers": {("scheduled_climate", entry_id)},
-            "name": name,
-        }
-        self._target_entity_id = target_entity_id
-        self._schedule_manager = schedule_manager
+        self._entry = entry
+        self._coordinator = coordinator
+        self._controller = controller
+        self._attr_unique_id = controller.target.key
+        self._attr_device_info = room_device_info(entry)
+        # A room named after its only device should not repeat itself.
+        self._attr_name = (
+            None if controller.target.name == entry.title else controller.target.name
+        )
+        self._target_entity_id = controller.target.entity_id
         self._target_state: State | None = None
         self._unsub_target_registry: Callable[[], None] | None = None
         self._unsub_target_state: Callable[[], None] | None = None
@@ -214,17 +274,26 @@ class ScheduledClimateEntity(ClimateEntity):
         self.async_on_remove(self._unsubscribe_target_registry)
         self.async_on_remove(self._unsubscribe_target_state)
         self.async_on_remove(
-            self._schedule_manager.timer.async_add_listener(
-                self._async_manager_state_changed
-            )
+            self._controller.timer.async_add_listener(self._async_view_changed)
         )
         self.async_on_remove(
-            self._schedule_manager.async_add_listener(self._async_manager_state_changed)
+            self._controller.async_add_listener(self._async_view_changed)
+        )
+        self.async_on_remove(
+            self._coordinator.async_add_listener(self._async_view_changed)
+        )
+        self._coordinator.async_register_entity(
+            self._controller.target.key, self.entity_id
+        )
+        self.async_on_remove(
+            lambda: self._coordinator.async_unregister_entity(
+                self._controller.target.key
+            )
         )
 
     @callback
-    def _async_manager_state_changed(self) -> None:
-        """Write state after the schedule or timer view changes."""
+    def _async_view_changed(self) -> None:
+        """Write state after the schedule, plan or timer view changes."""
         self.async_write_ha_state()
 
     @callback
@@ -273,14 +342,30 @@ class ScheduledClimateEntity(ClimateEntity):
         self._target_state = self.hass.states.get(self._target_entity_id)
         self._subscribe_target_registry()
         self._subscribe_target_state()
-
-        if entry := self.hass.config_entries.async_get_entry(self._attr_unique_id):
-            self.hass.config_entries.async_update_entry(
-                entry,
-                data={**entry.data, CONF_TARGET_ENTITY_ID: self._target_entity_id},
-            )
-
+        self._controller.async_set_target_entity_id(self._target_entity_id)
+        self._async_persist_target_entity_id()
         self.async_write_ha_state()
+
+    @callback
+    def _async_persist_target_entity_id(self) -> None:
+        """Record the renamed target entity id in the config entry."""
+        config = self._coordinator.config
+        targets = [
+            TargetConfig(
+                key=target.key,
+                entity_id=(
+                    self._target_entity_id
+                    if target.key == self._controller.target.key
+                    else target.entity_id
+                ),
+                name=target.name,
+            )
+            for target in config.targets
+        ]
+        self.hass.config_entries.async_update_entry(
+            self._entry,
+            data={**self._entry.data, CONF_TARGETS: targets_as_data(targets)},
+        )
 
     async def _async_target_state_changed(
         self, event: Event[EventStateChangedData]
@@ -305,46 +390,132 @@ class ScheduledClimateEntity(ClimateEntity):
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
-        """Return schedule diagnostics."""
-        manager = self._schedule_manager
-        active_block = manager.active_block
-        next_event = manager.next_event
+        """Return schedule, plan and hold diagnostics."""
+        controller = self._controller
+        coordinator = self._coordinator
+        plans = coordinator.plans
+        active_block = controller.active_block
+        next_event = controller.next_event
+        override = controller.override.state
+        active_plan = plans.active_plan
+
         return {
-            ATTR_SCHEDULE_ENABLED: manager.enabled,
-            ATTR_SCHEDULE_ENTITY_ID: manager.schedule_entity_id,
-            ATTR_SCHEDULE_ID: manager.schedule_id,
+            ATTR_TARGET_KEY: controller.target.key,
+            ATTR_ROOM_ENTITIES: coordinator.async_room_entity_ids(),
+            ATTR_SCHEDULE_ENABLED: controller.enabled,
+            ATTR_SCHEDULE_ENTITY_ID: controller.schedule_entity_id,
+            ATTR_SCHEDULE_ID: controller.schedule_id,
             ATTR_SCHEDULE_ACTIVE: active_block is not None,
             ATTR_ACTIVE_SCHEDULE_BLOCK: (
                 active_block.as_dict() if active_block else None
             ),
             ATTR_NEXT_SCHEDULE_EVENT: next_event.isoformat() if next_event else None,
-            ATTR_SCHEDULE_ISSUES: list(manager.issues),
-            ATTR_LEGACY_SCHEDULE: manager.legacy_schedule,
-            ATTR_TIMER_ACTION: manager.timer.action,
+            ATTR_SCHEDULE_ISSUES: list(controller.issues),
+            ATTR_LEGACY_SCHEDULE: coordinator.config.legacy_schedule,
+            ATTR_PLAN_OPTIONS: list(coordinator.config.plan_names),
+            ATTR_PLAN_SCHEDULES: coordinator.async_plan_schedule_ids(
+                controller.target.key
+            ),
+            ATTR_ACTIVE_PLAN: active_plan.name if active_plan else None,
+            ATTR_PLAN_SELECTION_MODE: coordinator.config.plan_selection.mode,
+            ATTR_PLAN_RESOLVED_AUTOMATICALLY: (
+                plans.automatic and plans.automatic_available
+            ),
+            ATTR_OVERRIDE_ACTIVE: override is not None,
+            ATTR_OVERRIDE_UNTIL: override.until.isoformat() if override else None,
+            ATTR_OVERRIDE_BLOCK: override.block.as_dict() if override else None,
+            ATTR_TIMER_ACTION: controller.timer.action,
             ATTR_TIMER_DEADLINE: (
-                manager.timer.deadline.isoformat() if manager.timer.deadline else None
+                controller.timer.deadline.isoformat()
+                if controller.timer.deadline
+                else None
             ),
         }
 
+    # ------------------------------------------------------------------
+    # Timer services
+    # ------------------------------------------------------------------
+
     async def async_start_on_timer(self, duration: timedelta) -> None:
         """Start or replace a timer that turns the target on."""
-        await self._schedule_manager.timer.async_start("on", duration)
+        await self._controller.timer.async_start("on", duration)
 
     async def async_start_off_timer(self, duration: timedelta) -> None:
         """Start or replace a timer that turns the target off."""
-        await self._schedule_manager.timer.async_start("off", duration)
+        await self._controller.timer.async_start("off", duration)
 
     async def async_cancel_timer(self) -> None:
         """Cancel the active timer."""
-        await self._schedule_manager.timer.async_cancel()
+        await self._controller.timer.async_cancel()
 
-    async def async_link_schedule(self, schedule_id: str | None = None) -> None:
-        """Link, or unlink, the schedule helper that drives this entity."""
-        entry = self.hass.config_entries.async_get_entry(self._attr_unique_id)
-        if entry is None:
-            raise ServiceValidationError("Config entry is no longer available")
+    # ------------------------------------------------------------------
+    # Hold services
+    # ------------------------------------------------------------------
 
-        options = dict(entry.options)
+    async def async_set_override(self, **values: Any) -> None:
+        """Hold the target at requested settings for a while."""
+        block = ScheduleBlock(
+            hvac_mode=values.get(ATTR_HVAC_MODE),
+            temperature=values.get(ATTR_TEMPERATURE),
+            target_temp_low=values.get(ATTR_TARGET_TEMP_LOW),
+            target_temp_high=values.get(ATTR_TARGET_TEMP_HIGH),
+            fan_mode=values.get(ATTR_FAN_MODE),
+            humidity=values.get(ATTR_HUMIDITY),
+        )
+        if block.is_empty:
+            raise ServiceValidationError(
+                "A hold needs at least one climate setting to apply"
+            )
+
+        await self._controller.async_set_override(
+            block, self._override_deadline(values)
+        )
+
+    def _override_deadline(self, values: dict[str, Any]) -> datetime:
+        """Return when a requested hold should lapse."""
+        bounds = self._coordinator.config.override
+        duration: timedelta | None = values.get(ATTR_DURATION)
+        until_next_block = values.get(ATTR_UNTIL_NEXT_BLOCK)
+
+        if duration is not None:
+            minutes = bounds.clamp_minutes(duration.total_seconds() / 60)
+            return dt_util.utcnow() + timedelta(minutes=minutes)
+
+        now = dt_util.utcnow()
+        if until_next_block is not False:
+            next_event = self._controller.next_event
+            if next_event is not None and next_event > now:
+                return min(
+                    dt_util.as_utc(next_event),
+                    now + timedelta(minutes=bounds.max_minutes),
+                )
+
+        return now + timedelta(minutes=bounds.default_minutes)
+
+    async def async_clear_override(self) -> None:
+        """Drop the active hold and resume the schedule."""
+        await self._controller.async_clear_override()
+
+    # ------------------------------------------------------------------
+    # Schedule and plan services
+    # ------------------------------------------------------------------
+
+    async def async_select_plan(self, plan: str) -> None:
+        """Select the plan the whole room follows."""
+        try:
+            await self._coordinator.async_select_plan(plan)
+        except ValueError as error:
+            raise ServiceValidationError(str(error)) from error
+
+    async def async_link_schedule(
+        self, schedule_id: str | None = None, plan: str | None = None
+    ) -> None:
+        """Link, or unlink, a schedule helper for this target and plan."""
+        config = self._coordinator.config
+        key = self._controller.target.key
+        target_plan = self._resolve_plan(plan)
+
+        schedule_entity_id: str | None = None
         if schedule_id:
             schedule_entity_id = async_resolve_schedule_entity_id(
                 self.hass, schedule_id
@@ -353,37 +524,72 @@ class ScheduledClimateEntity(ClimateEntity):
                 raise ServiceValidationError(
                     f"No schedule helper found for '{schedule_id}'"
                 )
-            options[CONF_SCHEDULE_ENTITY_ID] = schedule_entity_id
-            options[CONF_SCHEDULE_ENABLED] = True
+
+        updated = target_plan.with_schedule(key, schedule_entity_id)
+        plans = list(config.plans)
+        for index, existing in enumerate(plans):
+            if existing.id == updated.id:
+                plans[index] = updated
+                break
+        else:
+            plans.append(updated)
+
+        behaviors = dict(config.behaviors)
+        if schedule_entity_id:
+            behaviors[key] = replace(config.behavior_for(key), schedule_enabled=True)
+
+        options = options_from_config(config, behaviors=behaviors, plans=plans)
+        if schedule_entity_id:
             options.pop(CONF_LEGACY_ON_TIME, None)
             options.pop(CONF_LEGACY_OFF_TIME, None)
-        else:
-            options.pop(CONF_SCHEDULE_ENTITY_ID, None)
-            options[CONF_SCHEDULE_ENABLED] = False
 
-        self.hass.config_entries.async_update_entry(entry, options=options)
+        self.hass.config_entries.async_update_entry(self._entry, options=options)
+
+    def _resolve_plan(self, plan: str | None) -> PlanConfig:
+        """Return the plan a link request targets, creating a default one."""
+        config = self._coordinator.config
+        if plan:
+            resolved = config.plan_by_name(plan)
+            if resolved is None:
+                raise ServiceValidationError(f"Unknown plan '{plan}'")
+            return resolved
+
+        active = self._coordinator.plans.active_plan
+        if active is not None:
+            return active
+        if config.plans:
+            return config.plans[0]
+        return PlanConfig(id=new_key(), name=DEFAULT_PLAN_NAME)
 
     async def async_enable_schedule(self) -> None:
-        """Enable the linked schedule without changing which schedule is linked."""
-        entry = self.hass.config_entries.async_get_entry(self._attr_unique_id)
-        if entry is None:
-            raise ServiceValidationError("Config entry is no longer available")
-        if not entry.options.get(CONF_SCHEDULE_ENTITY_ID):
+        """Apply the active plan's schedule to this target again."""
+        config = self._coordinator.config
+        key = self._controller.target.key
+        if self._coordinator.plans.schedule_entity_id(key) is None:
             raise ServiceValidationError(
                 "Cannot enable the schedule: no schedule helper is linked"
             )
         self.hass.config_entries.async_update_entry(
-            entry, options={**entry.options, CONF_SCHEDULE_ENABLED: True}
+            self._entry,
+            options=options_with_behavior(
+                config, key, replace(config.behavior_for(key), schedule_enabled=True)
+            ),
         )
 
     async def async_disable_schedule(self) -> None:
-        """Disable the linked schedule without unlinking it."""
-        entry = self.hass.config_entries.async_get_entry(self._attr_unique_id)
-        if entry is None:
-            raise ServiceValidationError("Config entry is no longer available")
+        """Stop applying the schedule to this target without unlinking it."""
+        config = self._coordinator.config
+        key = self._controller.target.key
         self.hass.config_entries.async_update_entry(
-            entry, options={**entry.options, CONF_SCHEDULE_ENABLED: False}
+            self._entry,
+            options=options_with_behavior(
+                config, key, replace(config.behavior_for(key), schedule_enabled=False)
+            ),
         )
+
+    # ------------------------------------------------------------------
+    # Mirrored target state
+    # ------------------------------------------------------------------
 
     @property
     def hvac_mode(self) -> HVACMode | None:

@@ -1,6 +1,6 @@
 start_on_timer:
   name: Start on timer
-  description: Starts or replaces a timer that turns the climate entity on.
+  description: Starts or replaces a timer that turns the target on.
   target:
     entity:
       integration: scheduled_climate
@@ -8,14 +8,14 @@ start_on_timer:
   fields:
     duration:
       name: Duration
-      description: Time to wait before turning the climate entity on.
+      description: Time to wait before turning the target on.
       required: true
       selector:
         duration:
 
 start_off_timer:
   name: Start off timer
-  description: Starts or replaces a timer that turns the climate entity off.
+  description: Starts or replaces a timer that turns the target off.
   target:
     entity:
       integration: scheduled_climate
@@ -23,14 +23,14 @@ start_off_timer:
   fields:
     duration:
       name: Duration
-      description: Time to wait before turning the climate entity off.
+      description: Time to wait before turning the target off.
       required: true
       selector:
         duration:
 
 cancel_timer:
   name: Cancel timer
-  description: Cancels the active timer for the climate entity.
+  description: Cancels the active timer for the target.
   target:
     entity:
       integration: scheduled_climate
@@ -38,12 +38,18 @@ cancel_timer:
 
 link_schedule:
   name: Link schedule
-  description: Links a schedule helper to the climate entity, or unlinks it when no schedule is given.
+  description: Links a schedule helper to the target for a plan, or unlinks it when no schedule is given.
   target:
     entity:
       integration: scheduled_climate
       domain: climate
   fields:
+    plan:
+      name: Plan
+      description: Name of the plan to link the helper to. Defaults to the currently active plan.
+      required: false
+      selector:
+        text:
     schedule_id:
       name: Schedule ID
       description: Storage ID of the schedule helper. Leave empty to unlink the current schedule.
@@ -53,7 +59,7 @@ link_schedule:
 
 enable_schedule:
   name: Enable schedule
-  description: Resumes applying the linked schedule to the climate entity.
+  description: Resumes applying the linked schedule to the target.
   target:
     entity:
       integration: scheduled_climate
@@ -61,8 +67,112 @@ enable_schedule:
 
 disable_schedule:
   name: Disable schedule
-  description: Pauses the linked schedule without unlinking it. The schedule can be re-enabled later.
+  description: Pauses the linked schedule for the target without unlinking it. The schedule can be re-enabled later.
   target:
     entity:
       integration: scheduled_climate
       domain: climate
+
+set_override:
+  name: Set override
+  description: Holds the target at chosen settings for a while, suppressing the schedule until the hold ends.
+  target:
+    entity:
+      integration: scheduled_climate
+      domain: climate
+  fields:
+    until_next_block:
+      name: Until next block
+      description: Hold until the next scheduled change.
+      required: false
+      default: true
+      selector:
+        boolean:
+    duration:
+      name: Duration
+      description: Explicit hold length. Clamped to the configured maximum and takes precedence over "Until next block".
+      required: false
+      selector:
+        duration:
+    hvac_mode:
+      name: HVAC mode
+      description: HVAC mode to hold the target in.
+      required: false
+      selector:
+        select:
+          options:
+            - "off"
+            - heat
+            - cool
+            - heat_cool
+            - auto
+            - dry
+            - fan_only
+    temperature:
+      name: Temperature
+      description: Target temperature to hold.
+      required: false
+      selector:
+        number:
+          min: 0
+          max: 250
+          step: 0.1
+          mode: box
+    target_temp_low:
+      name: Target temperature low
+      description: Lower target temperature to hold in a range mode.
+      required: false
+      selector:
+        number:
+          min: 0
+          max: 250
+          step: 0.1
+          mode: box
+    target_temp_high:
+      name: Target temperature high
+      description: Upper target temperature to hold in a range mode.
+      required: false
+      selector:
+        number:
+          min: 0
+          max: 250
+          step: 0.1
+          mode: box
+    fan_mode:
+      name: Fan mode
+      description: Fan mode to hold the target in.
+      required: false
+      selector:
+        text:
+    humidity:
+      name: Humidity
+      description: Target humidity to hold.
+      required: false
+      selector:
+        number:
+          min: 0
+          max: 100
+          step: 1
+
+clear_override:
+  name: Clear override
+  description: Ends the active hold and resumes the schedule.
+  target:
+    entity:
+      integration: scheduled_climate
+      domain: climate
+
+select_plan:
+  name: Select plan
+  description: Selects the active plan for the room, or hands the choice back to the outdoor temperature sensor.
+  target:
+    entity:
+      integration: scheduled_climate
+      domain: climate
+  fields:
+    plan:
+      name: Plan
+      description: Name of the plan to activate, or "automatic" to let the outdoor temperature sensor choose.
+      required: true
+      selector:
+        text:

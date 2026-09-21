@@ -7,7 +7,7 @@ the block is active, so a block is read straight off the schedule entity state.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
@@ -102,6 +102,23 @@ class ScheduleBlock:
             ATTR_FAN_MODE: self.fan_mode,
             ATTR_HUMIDITY: self.humidity,
         }
+
+    @classmethod
+    def from_dict(cls, data: Mapping[str, Any]) -> ScheduleBlock:
+        """Return a block from a stored mapping, ignoring unusable values."""
+        return cls(
+            hvac_mode=_as_text(data.get(ATTR_HVAC_MODE)),
+            temperature=_as_number(data.get(ATTR_TEMPERATURE)),
+            target_temp_low=_as_number(data.get(ATTR_TARGET_TEMP_LOW)),
+            target_temp_high=_as_number(data.get(ATTR_TARGET_TEMP_HIGH)),
+            fan_mode=_as_text(data.get(ATTR_FAN_MODE)),
+            humidity=_as_number(data.get(ATTR_HUMIDITY)),
+        )
+
+    @property
+    def is_empty(self) -> bool:
+        """Return whether the block requests no specific settings."""
+        return all(value is None for value in self.as_dict().values())
 
 
 @dataclass(frozen=True, slots=True)

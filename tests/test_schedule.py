@@ -1,7 +1,8 @@
-"""Tests for applying a linked schedule helper."""
+"""Tests for applying the active plan's schedule helper to one target."""
 
 from typing import Any
 
+from conftest import make_room_entry, make_target
 from homeassistant.components.climate import (
     ATTR_FAN_MODE,
     ATTR_FAN_MODES,
@@ -28,24 +29,25 @@ from homeassistant.const import (
     STATE_UNAVAILABLE,
 )
 from homeassistant.core import HomeAssistant, ServiceCall
-from homeassistant.data_entry_flow import FlowResultType
+from homeassistant.helpers import issue_registry as ir
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.scheduled_climate.const import (
-    CONF_APPLY_ON_START,
-    CONF_DEFAULT_HVAC_MODE,
-    CONF_OFF_BEHAVIOR,
-    CONF_SCHEDULE_ENABLED,
-    CONF_SCHEDULE_ENTITY_ID,
-    CONF_TARGET_ENTITY_ID,
     DOMAIN,
+    ISSUE_BLOCK_UNSUPPORTED,
+    ISSUE_SCHEDULE_MISSING,
     OFF_BEHAVIOR_IGNORE,
     OFF_BEHAVIOR_TURN_OFF,
 )
-from custom_components.scheduled_climate.schedule import ScheduleManager
+from custom_components.scheduled_climate.models import (
+    PlanConfig,
+    TargetBehavior,
+)
+from custom_components.scheduled_climate.schedule import TargetController
 
 TARGET_ENTITY_ID = "climate.living_room"
 SCHEDULE_ENTITY_ID = "schedule.living_room"
+TARGET_KEY = "living-room-key"
 
 TARGET_FEATURES = (
     ClimateEntityFeature.TARGET_TEMPERATURE
@@ -94,20 +96,29 @@ def _capture_climate_calls(hass: HomeAssistant) -> list[ServiceCall]:
 
 
 async def _setup_entry(
-    hass: HomeAssistant, options: dict[str, Any] | None = None
+    hass: HomeAssistant,
+    *,
+    schedule_enabled: bool = True,
+    apply_on_start: bool = False,
+    off_behavior: str = OFF_BEHAVIOR_TURN_OFF,
+    default_hvac_mode: str = HVACMode.HEAT,
+    schedule_entity_id: str | None = SCHEDULE_ENTITY_ID,
 ) -> MockConfigEntry:
-    """Set up a config entry linked to the schedule helper."""
-    entry = MockConfigEntry(
-        domain=DOMAIN,
-        version=2,
+    """Set up a room whose active plan links the schedule helper."""
+    target = make_target(TARGET_ENTITY_ID, "Living Room", key=TARGET_KEY)
+    schedules = {TARGET_KEY: schedule_entity_id} if schedule_entity_id else {}
+    entry = make_room_entry(
         title="Living Room",
-        data={CONF_TARGET_ENTITY_ID: TARGET_ENTITY_ID},
-        options={
-            CONF_SCHEDULE_ENTITY_ID: SCHEDULE_ENTITY_ID,
-            CONF_SCHEDULE_ENABLED: True,
-            CONF_APPLY_ON_START: False,
-            **(options or {}),
+        targets=[target],
+        behaviors={
+            TARGET_KEY: TargetBehavior(
+                schedule_enabled=schedule_enabled,
+                default_hvac_mode=default_hvac_mode,
+                off_behavior=off_behavior,
+                apply_on_start=apply_on_start,
+            )
         },
+        plans=[PlanConfig(id="plan-default", name="Default", schedules=schedules)],
     )
     entry.add_to_hass(hass)
     assert await hass.config_entries.async_setup(entry.entry_id)
@@ -115,66 +126,19 @@ async def _setup_entry(
     return entry
 
 
-async def test_options_flow_saves_schedule_link(hass: HomeAssistant) -> None:
-    """Test saving a linked schedule helper."""
-    _set_target(hass)
-    _set_schedule(hass, STATE_OFF)
-    entry = await _setup_entry(hass)
-
-    result = await hass.config_entries.options.async_init(entry.entry_id)
-    assert result["type"] is FlowResultType.FORM
-    result = await hass.config_entries.options.async_configure(
-        result["flow_id"],
-        {
-            CONF_SCHEDULE_ENTITY_ID: SCHEDULE_ENTITY_ID,
-            CONF_SCHEDULE_ENABLED: True,
-            CONF_DEFAULT_HVAC_MODE: HVACMode.HEAT,
-            CONF_OFF_BEHAVIOR: OFF_BEHAVIOR_TURN_OFF,
-            CONF_APPLY_ON_START: True,
-        },
-    )
-
-    assert result["type"] is FlowResultType.CREATE_ENTRY
-    assert result["data"][CONF_SCHEDULE_ENTITY_ID] == SCHEDULE_ENTITY_ID
-    assert result["data"][CONF_SCHEDULE_ENABLED] is True
-
-
-async def test_options_flow_requires_schedule_when_enabled(
-    hass: HomeAssistant,
-) -> None:
-    """Test enabling without a schedule helper is rejected."""
-    _set_target(hass)
-    entry = MockConfigEntry(
-        domain=DOMAIN,
-        version=2,
-        title="Living Room",
-        data={CONF_TARGET_ENTITY_ID: TARGET_ENTITY_ID},
-        options={},
-    )
-    entry.add_to_hass(hass)
-    assert await hass.config_entries.async_setup(entry.entry_id)
-    await hass.async_block_till_done()
-
-    result = await hass.config_entries.options.async_init(entry.entry_id)
-    result = await hass.config_entries.options.async_configure(
-        result["flow_id"],
-        {
-            CONF_SCHEDULE_ENABLED: True,
-            CONF_DEFAULT_HVAC_MODE: HVACMode.HEAT,
-            CONF_OFF_BEHAVIOR: OFF_BEHAVIOR_TURN_OFF,
-            CONF_APPLY_ON_START: True,
-        },
-    )
-
-    assert result["type"] is FlowResultType.FORM
-    assert result["errors"] == {CONF_SCHEDULE_ENTITY_ID: "schedule_entity_required"}
+def _controller(hass: HomeAssistant, entry: MockConfigEntry) -> TargetController:
+    """Return the controller wrapping the single target."""
+    coordinator = hass.data[DOMAIN][entry.entry_id]
+    controller = coordinator.controller_for(TARGET_KEY)
+    assert controller is not None
+    return controller
 
 
 async def test_block_applies_mode_before_setpoints(hass: HomeAssistant) -> None:
     """Test a starting block applies the HVAC mode first."""
     _set_target(hass, HVACMode.OFF)
     _set_schedule(hass, STATE_OFF)
-    await _setup_entry(hass, {CONF_APPLY_ON_START: False})
+    await _setup_entry(hass, apply_on_start=False)
     calls = _capture_climate_calls(hass)
 
     _set_schedule(
@@ -246,7 +210,7 @@ async def test_off_behavior_ignore_leaves_target(hass: HomeAssistant) -> None:
     """Test the ignore off behavior leaves the target unchanged."""
     _set_target(hass)
     _set_schedule(hass, STATE_ON, **{ATTR_TEMPERATURE: 21})
-    await _setup_entry(hass, {CONF_OFF_BEHAVIOR: OFF_BEHAVIOR_IGNORE})
+    await _setup_entry(hass, off_behavior=OFF_BEHAVIOR_IGNORE)
     calls = _capture_climate_calls(hass)
 
     _set_schedule(hass, STATE_OFF)
@@ -261,7 +225,7 @@ async def test_apply_on_start_applies_active_block(hass: HomeAssistant) -> None:
     _set_schedule(hass, STATE_ON, **{ATTR_TEMPERATURE: 21})
     calls = _capture_climate_calls(hass)
 
-    await _setup_entry(hass, {CONF_APPLY_ON_START: True})
+    await _setup_entry(hass, apply_on_start=True)
 
     assert [call.service for call in calls] == [
         SERVICE_SET_HVAC_MODE,
@@ -277,7 +241,7 @@ async def test_apply_on_start_disabled_skips_active_block(
     _set_schedule(hass, STATE_ON, **{ATTR_TEMPERATURE: 21})
     calls = _capture_climate_calls(hass)
 
-    await _setup_entry(hass, {CONF_APPLY_ON_START: False})
+    await _setup_entry(hass, apply_on_start=False)
 
     assert calls == []
 
@@ -288,7 +252,7 @@ async def test_unavailable_target_retries_when_available(
     """Test a deferred block is applied once the target returns."""
     _set_target(hass, STATE_UNAVAILABLE)
     _set_schedule(hass, STATE_OFF)
-    await _setup_entry(hass, {CONF_APPLY_ON_START: False})
+    await _setup_entry(hass, apply_on_start=False)
     calls = _capture_climate_calls(hass)
 
     _set_schedule(hass, STATE_ON, **{ATTR_TEMPERATURE: 21})
@@ -301,26 +265,75 @@ async def test_unavailable_target_retries_when_available(
     assert [call.service for call in calls] == [SERVICE_SET_TEMPERATURE]
 
 
+async def test_restores_last_active_hvac_mode(hass: HomeAssistant) -> None:
+    """Test the remembered active mode wins over the default when turning on."""
+    _set_target(hass, HVACMode.HEAT)
+    _set_schedule(hass, STATE_ON, **{ATTR_TEMPERATURE: 21})
+    # The default mode differs from the running mode so the remembered mode,
+    # not the default, must be the one restored.
+    await _setup_entry(hass, default_hvac_mode=HVACMode.COOL)
+    calls = _capture_climate_calls(hass)
+
+    # The schedule ends: the target is turned off and HEAT is remembered.
+    _set_schedule(hass, STATE_OFF)
+    await hass.async_block_till_done()
+    assert [call.service for call in calls] == [SERVICE_SET_HVAC_MODE]
+    assert calls[0].data[ATTR_HVAC_MODE] == HVACMode.OFF
+
+    calls.clear()
+    _set_target(hass, HVACMode.OFF)
+
+    # A new block without a mode should turn the target back on using HEAT.
+    _set_schedule(hass, STATE_ON, **{ATTR_TEMPERATURE: 21})
+    await hass.async_block_till_done()
+
+    assert [call.service for call in calls] == [
+        SERVICE_SET_HVAC_MODE,
+        SERVICE_SET_TEMPERATURE,
+    ]
+    assert calls[0].data[ATTR_HVAC_MODE] == HVACMode.HEAT
+
+
 async def test_unsupported_setting_records_issue(hass: HomeAssistant) -> None:
     """Test unsupported block values are reported instead of applied."""
     _set_target(hass, HVACMode.HEAT, **{ATTR_SUPPORTED_FEATURES: 0})
     _set_schedule(hass, STATE_OFF)
-    entry = await _setup_entry(hass, {CONF_APPLY_ON_START: False})
+    entry = await _setup_entry(hass, apply_on_start=False)
     calls = _capture_climate_calls(hass)
 
     _set_schedule(hass, STATE_ON, **{ATTR_TEMPERATURE: 21})
     await hass.async_block_till_done()
 
     assert calls == []
-    manager: ScheduleManager = hass.data[DOMAIN][entry.entry_id]
-    assert manager.issues
+    controller = _controller(hass, entry)
+    assert controller.issues
+
+    issue = ir.async_get(hass).async_get_issue(
+        DOMAIN, f"{ISSUE_BLOCK_UNSUPPORTED}_{entry.entry_id}_{TARGET_KEY}"
+    )
+    assert issue is not None
+    assert issue.translation_placeholders["name"] == "Living Room"
+
+
+async def test_missing_schedule_helper_raises_issue(hass: HomeAssistant) -> None:
+    """Test a linked but non-existent schedule helper raises a repair."""
+    _set_target(hass)
+    entry = await _setup_entry(
+        hass, apply_on_start=False, schedule_entity_id="schedule.missing"
+    )
+
+    issue = ir.async_get(hass).async_get_issue(
+        DOMAIN, f"{ISSUE_SCHEDULE_MISSING}_{entry.entry_id}_{TARGET_KEY}"
+    )
+    assert issue is not None
+    assert issue.translation_placeholders["name"] == "Living Room"
 
 
 async def test_temperature_range_block(hass: HomeAssistant) -> None:
     """Test a block with a temperature range is applied as a range."""
     _set_target(hass)
     _set_schedule(hass, STATE_OFF)
-    await _setup_entry(hass, {CONF_APPLY_ON_START: False})
+    await _setup_entry(hass, apply_on_start=False)
     calls = _capture_climate_calls(hass)
 
     _set_schedule(
@@ -339,7 +352,7 @@ async def test_disabled_schedule_is_not_applied(hass: HomeAssistant) -> None:
     """Test a linked but disabled schedule never drives the target."""
     _set_target(hass)
     _set_schedule(hass, STATE_OFF)
-    await _setup_entry(hass, {CONF_SCHEDULE_ENABLED: False})
+    await _setup_entry(hass, schedule_enabled=False)
     calls = _capture_climate_calls(hass)
 
     _set_schedule(hass, STATE_ON, **{ATTR_TEMPERATURE: 21})

@@ -100,6 +100,42 @@ export class ScheduledClimateCardEditor extends LitElement {
         <label class="toggle">
           <input
             type="checkbox"
+            .checked=${this._config.show_plan !== false}
+            @change=${(event: Event) =>
+              this._setValue(
+                "show_plan",
+                (event.target as HTMLInputElement).checked,
+              )}
+          />
+          Show plan selector
+        </label>
+        <label class="toggle">
+          <input
+            type="checkbox"
+            .checked=${this._config.show_override !== false}
+            @change=${(event: Event) =>
+              this._setValue(
+                "show_override",
+                (event.target as HTMLInputElement).checked,
+              )}
+          />
+          Show hold (override) button
+        </label>
+        <label>
+          Default plan
+          <input
+            type="text"
+            .value=${this._config.default_plan ?? ""}
+            @input=${(event: Event) =>
+              this._setValue(
+                "default_plan",
+                (event.target as HTMLInputElement).value || undefined,
+              )}
+          />
+        </label>
+        <label class="toggle">
+          <input
+            type="checkbox"
             .checked=${this._config.schedule_editable !== false}
             @change=${(event: Event) =>
               this._setValue(

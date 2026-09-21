@@ -3,6 +3,8 @@ import { SCHEDULE_DAYS } from "./types";
 
 export interface BlockDraft {
   index: number | null;
+  /** The block as it was when editing started, used to re-find it on save. */
+  origin?: ScheduleTimeRange;
   from: string;
   to: string;
   hvac_mode: string;
@@ -58,7 +60,7 @@ export function toStorageTime(value: string, isEnd = false): string {
     : `${shortTime(value)}:00`;
 }
 
-function parseNumber(value: string): number | undefined {
+export function parseNumber(value: string): number | undefined {
   if (value.trim() === "") return undefined;
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : undefined;
@@ -97,6 +99,7 @@ export function timeRangeToDraft(
     data[key] === undefined ? "" : String(data[key]);
   return {
     index,
+    origin: cloneBlock(range),
     from: shortTime(range.from),
     to: shortTime(range.to) === "24:00" ? "00:00" : shortTime(range.to),
     hvac_mode: text("hvac_mode"),
@@ -189,4 +192,117 @@ export function blocksFromLegacy(
   const to = legacy?.off_time ? shortTime(legacy.off_time) : "22:00";
   if (toMinutes(to, true) <= toMinutes(from)) return [];
   return [{ from: `${from}:00`, to: toStorageTime(to, true) }];
+}
+
+/** Day groupings used by the copy quick-pick buttons. */
+export const DAY_GROUPS: {
+  all: ScheduleDay[];
+  weekdays: ScheduleDay[];
+  weekend: ScheduleDay[];
+} = {
+  all: [...SCHEDULE_DAYS],
+  weekdays: ["monday", "tuesday", "wednesday", "thursday", "friday"],
+  weekend: ["saturday", "sunday"],
+};
+
+function cloneBlock(block: ScheduleTimeRange): ScheduleTimeRange {
+  const copy: ScheduleTimeRange = { from: block.from, to: block.to };
+  if (block.data) copy.data = { ...block.data };
+  return copy;
+}
+
+function sameData(
+  a: ScheduleTimeRange["data"],
+  b: ScheduleTimeRange["data"],
+): boolean {
+  const left = Object.keys(a ?? {}).sort();
+  const right = Object.keys(b ?? {}).sort();
+  if (left.length !== right.length) return false;
+  return left.every(
+    (key, position) => key === right[position] && a?.[key] === b?.[key],
+  );
+}
+
+/** Return whether two blocks describe exactly the same time range and data. */
+export function sameBlock(a: ScheduleTimeRange, b: ScheduleTimeRange): boolean {
+  return a.from === b.from && a.to === b.to && sameData(a.data, b.data);
+}
+
+/**
+ * Locate a block by value rather than by position.
+ *
+ * Blocks are rendered from a sorted list, so a position is only meaningful for
+ * the list it came from. A schedule helper edited elsewhere arrives over the
+ * `schedule/subscribe` push and can reorder that list underneath an open
+ * editor, so a committed edit must re-find its block instead of trusting the
+ * index it was opened with.
+ */
+export function findBlockIndex(
+  blocks: ScheduleTimeRange[],
+  block: ScheduleTimeRange | undefined,
+): number {
+  if (!block) return -1;
+  return blocks.findIndex((candidate) => sameBlock(candidate, block));
+}
+
+function overlaps(a: ScheduleTimeRange, b: ScheduleTimeRange): boolean {
+  return (
+    toMinutes(a.from) < toMinutes(b.to, true) &&
+    toMinutes(a.to, true) > toMinutes(b.from)
+  );
+}
+
+/**
+ * Apply a set of source blocks onto every target day of a schedule.
+ *
+ * In `replace` mode each target day is overwritten with a sorted copy of the
+ * source blocks. In `merge` mode the target day keeps its own blocks and only
+ * non-overlapping source blocks are added; a day is reported as a conflict when
+ * at least one source block was dropped because it overlapped an existing one.
+ *
+ * The input schedule is never mutated.
+ */
+export function copyDayToBlocks(
+  blocks: ScheduleTimeRange[],
+  schedule: ScheduleItem,
+  targetDays: ScheduleDay[],
+  mode: "replace" | "merge",
+): { schedule: ScheduleItem; conflicts: ScheduleDay[] } {
+  const next: ScheduleItem = { ...schedule };
+  const conflicts: ScheduleDay[] = [];
+  const source = sortBlocks(blocks);
+
+  for (const day of targetDays) {
+    if (mode === "replace") {
+      next[day] = source.map(cloneBlock);
+      continue;
+    }
+
+    const existing = sortBlocks(next[day] ?? schedule[day] ?? []);
+    const merged = existing.map(cloneBlock);
+    let dropped = false;
+    for (const block of source) {
+      if (merged.some((other) => overlaps(block, other))) {
+        dropped = true;
+        continue;
+      }
+      merged.push(cloneBlock(block));
+    }
+    next[day] = sortBlocks(merged);
+    if (dropped) conflicts.push(day);
+  }
+
+  return { schedule: next, conflicts };
+}
+
+/** Copy one day of a schedule onto other days of the same schedule. */
+export function copyDayTo(
+  schedule: ScheduleItem,
+  sourceDay: ScheduleDay,
+  targetDays: ScheduleDay[],
+  mode: "replace" | "merge",
+): { schedule: ScheduleItem; conflicts: ScheduleDay[] } {
+  const source = schedule[sourceDay] ?? [];
+  const days = targetDays.filter((day) => day !== sourceDay);
+  return copyDayToBlocks(source, schedule, days, mode);
 }

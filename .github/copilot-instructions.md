@@ -338,6 +338,16 @@ Generated code should pass:
 * Pytest
 * Type checking
 
+## Changelog
+
+Always update `docs/CHANGELOG.md` with a summary of changes for every release. Continue updating the same changelog entry until the release is published. Use the following format:
+
+```text
+## [Unreleased]
+### Added
+### Changed
+### Fixed
+
 ## Copilot Behavior Requirements
 
 When generating code:

@@ -35,6 +35,16 @@ export interface HassEntity {
     legacy_schedule?: { on_time: string; off_time: string } | null;
     timer_action?: string | null;
     timer_deadline?: string | null;
+    target_key?: string;
+    room_entities?: string[];
+    plan_options?: string[];
+    active_plan?: string | null;
+    plan_selection_mode?: "manual" | "outdoor_temp";
+    plan_resolved_automatically?: boolean;
+    plan_schedules?: Record<string, string | null>;
+    override_active?: boolean;
+    override_until?: string | null;
+    override_block?: ScheduleBlockData | null;
   };
 }
 
@@ -96,8 +106,11 @@ export interface ScheduledClimateCardConfig {
   layout?: "standard" | "compact";
   show_schedule?: boolean;
   show_timer?: boolean;
+  show_plan?: boolean;
+  show_override?: boolean;
   schedule_editable?: boolean;
   default_schedule_day?: ScheduleDay;
+  default_plan?: string;
   timer_presets?: number[];
 }
 

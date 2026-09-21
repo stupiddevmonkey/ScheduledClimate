@@ -1,4 +1,9 @@
-"""Schedule helper integration for Scheduled Climate."""
+"""Per-target schedule control for Scheduled Climate.
+
+One :class:`TargetController` owns a single climate entity in a room: the
+schedule helper it currently follows (which changes when the active plan
+changes), its one-shot timer, and its temporary override.
+"""
 
 from __future__ import annotations
 
@@ -38,24 +43,14 @@ from homeassistant.helpers.storage import Store
 
 from .block import ScheduleBlock, build_plan
 from .const import (
-    CONF_APPLY_ON_START,
-    CONF_DEFAULT_HVAC_MODE,
-    CONF_LEGACY_OFF_TIME,
-    CONF_LEGACY_ON_TIME,
-    CONF_OFF_BEHAVIOR,
-    CONF_SCHEDULE_ENABLED,
-    CONF_SCHEDULE_ENTITY_ID,
-    CONF_TARGET_ENTITY_ID,
-    DEFAULT_APPLY_ON_START,
-    DEFAULT_HVAC_MODE,
-    DEFAULT_OFF_BEHAVIOR,
-    DEFAULT_SCHEDULE_ENABLED,
     DOMAIN,
     ISSUE_BLOCK_UNSUPPORTED,
     ISSUE_SCHEDULE_MISSING,
     ISSUE_SCHEDULE_NOT_LINKED,
     OFF_BEHAVIOR_IGNORE,
 )
+from .models import RoomConfig, TargetBehavior, TargetConfig
+from .override import OverrideManager, OverrideState
 from .timer import TimerManager
 
 _LOGGER = logging.getLogger(__name__)
@@ -65,6 +60,12 @@ STORAGE_KEY = "scheduled_climate"
 STORAGE_LAST_ACTIVE_HVAC_MODE = "last_active_hvac_mode"
 
 UNUSABLE_STATES = frozenset({STATE_UNAVAILABLE, STATE_UNKNOWN})
+
+TARGET_ISSUES = (
+    ISSUE_SCHEDULE_MISSING,
+    ISSUE_SCHEDULE_NOT_LINKED,
+    ISSUE_BLOCK_UNSUPPORTED,
+)
 
 
 class ScheduleStorageData(TypedDict, total=False):
@@ -82,13 +83,22 @@ _UNSET = _Unset()
 AppliedBlock = ScheduleBlock | None | _Unset
 
 
-class ScheduleManager:
-    """Apply a linked schedule helper to the target climate entity."""
+class TargetController:
+    """Apply the active plan's schedule helper to one climate entity."""
 
-    def __init__(self, hass: HomeAssistant, entry: ConfigEntry) -> None:
-        """Initialize the schedule manager."""
+    def __init__(
+        self,
+        hass: HomeAssistant,
+        entry: ConfigEntry,
+        target: TargetConfig,
+        config: RoomConfig,
+    ) -> None:
+        """Initialize the controller for one target."""
         self.hass = hass
         self.entry = entry
+        self.target = target
+        self._config = config
+        self._schedule_entity_id: str | None = None
         self._unsubscribers: list[Callable[[], None]] = []
         self._listeners: list[Callable[[], None]] = []
         self._last_active_hvac_mode: HVACMode | None = None
@@ -98,17 +108,26 @@ class ScheduleManager:
         self._store = Store[ScheduleStorageData](
             hass,
             STORAGE_VERSION,
-            f"{STORAGE_KEY}.{entry.entry_id}",
+            f"{STORAGE_KEY}.{target.key}",
         )
         self.timer = TimerManager(
             hass,
-            entry.entry_id,
+            target.key,
             self.async_handle_on,
             self.async_handle_off,
         )
+        self.override = OverrideManager(
+            hass,
+            target.key,
+            self._async_override_expired,
+        )
 
-    async def async_initialize(self) -> None:
-        """Restore runtime state and start following the linked schedule."""
+    # ------------------------------------------------------------------
+    # Lifecycle
+    # ------------------------------------------------------------------
+
+    async def async_initialize(self, schedule_entity_id: str | None) -> None:
+        """Restore runtime state and start following a schedule helper."""
         stored = await self._store.async_load()
         if stored and (mode := stored.get(STORAGE_LAST_ACTIVE_HVAC_MODE)):
             try:
@@ -118,9 +137,15 @@ class ScheduleManager:
             if restored_mode is not HVACMode.OFF:
                 self._last_active_hvac_mode = restored_mode
 
+        self._schedule_entity_id = schedule_entity_id
         self.async_setup()
 
-        if self.enabled and self.apply_on_start:
+        await self.override.async_initialize()
+
+        if self.override.active:
+            await self._async_apply_override()
+            self._last_applied = self.active_block
+        elif self.enabled and self.apply_on_start:
             await self._async_handle_block(self.active_block)
         else:
             self._last_applied = self.active_block
@@ -128,43 +153,108 @@ class ScheduleManager:
         self._async_update_issues()
         await self.timer.async_initialize()
 
+    @callback
+    def async_setup(self) -> None:
+        """Track the current schedule helper and the target availability."""
+        self._cancel_schedule_callbacks()
+        self._unsubscribers.append(
+            async_track_state_change_event(
+                self.hass, [self.target.entity_id], self._async_target_changed
+            )
+        )
+        if self._schedule_entity_id is None:
+            return
+
+        self._unsubscribers.append(
+            async_track_state_change_event(
+                self.hass, [self._schedule_entity_id], self._async_schedule_changed
+            )
+        )
+
+    @callback
+    def async_shutdown(self) -> None:
+        """Cancel all registered runtime callbacks."""
+        self._cancel_schedule_callbacks()
+        self._listeners.clear()
+        for issue in TARGET_ISSUES:
+            ir.async_delete_issue(self.hass, DOMAIN, self._issue_id(issue))
+        self.timer.async_shutdown()
+        self.override.async_shutdown()
+
+    @callback
+    def _cancel_schedule_callbacks(self) -> None:
+        """Cancel registered state callbacks."""
+        while self._unsubscribers:
+            self._unsubscribers.pop()()
+
+    async def async_update_config(
+        self, config: RoomConfig, schedule_entity_id: str | None
+    ) -> None:
+        """Adopt a new room configuration and possibly a new schedule helper."""
+        self._config = config
+        target = config.target_by_key(self.target.key)
+        entity_changed = (
+            target is not None and target.entity_id != self.target.entity_id
+        )
+        if target is not None:
+            self.target = target
+
+        if entity_changed or schedule_entity_id != self._schedule_entity_id:
+            self._schedule_entity_id = schedule_entity_id
+            self._last_applied = _UNSET
+            self._pending = _UNSET
+            self.async_setup()
+
+        if not self.override.active and self.enabled:
+            await self._async_handle_block(self.active_block)
+        self._async_update_issues()
+        self._notify_listeners()
+
+    @callback
+    def async_set_target_entity_id(self, entity_id: str) -> None:
+        """Follow the target after Home Assistant renames its entity id."""
+        if entity_id == self.target.entity_id:
+            return
+        self.target = TargetConfig(
+            key=self.target.key, entity_id=entity_id, name=self.target.name
+        )
+        self.async_setup()
+
+    # ------------------------------------------------------------------
+    # Configuration views
+    # ------------------------------------------------------------------
+
+    @property
+    def behavior(self) -> TargetBehavior:
+        """Return the configured behaviour for this target."""
+        return self._config.behavior_for(self.target.key)
+
     @property
     def target_entity_id(self) -> str:
         """Return the wrapped climate entity id."""
-        return self.entry.data[CONF_TARGET_ENTITY_ID]
+        return self.target.entity_id
 
     @property
     def schedule_entity_id(self) -> str | None:
-        """Return the linked schedule helper entity id."""
-        return self.entry.options.get(CONF_SCHEDULE_ENTITY_ID) or None
+        """Return the schedule helper entity id currently followed."""
+        return self._schedule_entity_id
 
     @property
     def enabled(self) -> bool:
-        """Return whether the linked schedule is applied to the target."""
-        if self.schedule_entity_id is None:
+        """Return whether the schedule is applied to the target."""
+        if self._schedule_entity_id is None:
             return False
-        return bool(
-            self.entry.options.get(CONF_SCHEDULE_ENABLED, DEFAULT_SCHEDULE_ENABLED)
-        )
+        return self.behavior.schedule_enabled
 
     @property
     def off_behavior(self) -> str:
         """Return what happens when no schedule block is active."""
-        return self.entry.options.get(CONF_OFF_BEHAVIOR, DEFAULT_OFF_BEHAVIOR)
+        return self.behavior.off_behavior
 
     @property
     def apply_on_start(self) -> bool:
         """Return whether the active block is applied during setup."""
-        return bool(self.entry.options.get(CONF_APPLY_ON_START, DEFAULT_APPLY_ON_START))
-
-    @property
-    def legacy_schedule(self) -> dict[str, str] | None:
-        """Return the pre-migration daily times still waiting to be converted."""
-        on_time = self.entry.options.get(CONF_LEGACY_ON_TIME)
-        off_time = self.entry.options.get(CONF_LEGACY_OFF_TIME)
-        if not on_time and not off_time:
-            return None
-        return {"on_time": on_time or "", "off_time": off_time or ""}
+        return self.behavior.apply_on_start
 
     @property
     def issues(self) -> tuple[str, ...]:
@@ -173,8 +263,8 @@ class ScheduleManager:
 
     @property
     def schedule_state(self) -> State | None:
-        """Return the linked schedule helper state."""
-        entity_id = self.schedule_entity_id
+        """Return the followed schedule helper state."""
+        entity_id = self._schedule_entity_id
         return self.hass.states.get(entity_id) if entity_id else None
 
     @property
@@ -193,12 +283,16 @@ class ScheduleManager:
 
     @property
     def schedule_id(self) -> str | None:
-        """Return the storage collection id of the linked schedule helper."""
-        entity_id = self.schedule_entity_id
+        """Return the storage collection id of the followed schedule helper."""
+        entity_id = self._schedule_entity_id
         if entity_id is None:
             return None
         registry_entry = er.async_get(self.hass).async_get(entity_id)
         return registry_entry.unique_id if registry_entry else None
+
+    # ------------------------------------------------------------------
+    # Listeners
+    # ------------------------------------------------------------------
 
     @callback
     def async_add_listener(self, listener: Callable[[], None]) -> Callable[[], None]:
@@ -214,42 +308,51 @@ class ScheduleManager:
         return remove_listener
 
     @callback
-    def async_setup(self) -> None:
-        """Track the linked schedule helper and the target availability."""
-        self._cancel_schedule_callbacks()
-        entity_id = self.schedule_entity_id
-        if entity_id is None:
+    def _notify_listeners(self) -> None:
+        """Notify registered listeners that the schedule view changed."""
+        for listener in list(self._listeners):
+            listener()
+
+    # ------------------------------------------------------------------
+    # Overrides
+    # ------------------------------------------------------------------
+
+    async def async_set_override(self, block: ScheduleBlock, until: datetime) -> None:
+        """Hold the target at a requested block until a deadline."""
+        await self.override.async_set(block, until)
+        await self._async_apply_override()
+        self._notify_listeners()
+
+    async def async_clear_override(self) -> None:
+        """Drop the active hold and resume the schedule immediately."""
+        if not self.override.active:
             return
+        await self.override.async_clear()
+        await self._async_resume_schedule()
+        self._notify_listeners()
 
-        self._unsubscribers.append(
-            async_track_state_change_event(
-                self.hass, [entity_id], self._async_schedule_changed
-            )
-        )
-        self._unsubscribers.append(
-            async_track_state_change_event(
-                self.hass, [self.target_entity_id], self._async_target_changed
-            )
-        )
+    async def _async_override_expired(self, _now: datetime) -> None:
+        """Resume the schedule once a hold runs out."""
+        await self._async_resume_schedule()
+        self._notify_listeners()
 
-    @callback
-    def async_shutdown(self) -> None:
-        """Cancel all registered runtime callbacks."""
-        self._cancel_schedule_callbacks()
-        self._listeners.clear()
-        for issue in (
-            ISSUE_SCHEDULE_MISSING,
-            ISSUE_SCHEDULE_NOT_LINKED,
-            ISSUE_BLOCK_UNSUPPORTED,
-        ):
-            ir.async_delete_issue(self.hass, DOMAIN, self._issue_id(issue))
-        self.timer.async_shutdown()
+    async def _async_apply_override(self) -> None:
+        """Push the held block to the target."""
+        state = self.override.state
+        if state is None:
+            return
+        await self._async_apply(state.block)
 
-    @callback
-    def _cancel_schedule_callbacks(self) -> None:
-        """Cancel registered schedule callbacks."""
-        while self._unsubscribers:
-            self._unsubscribers.pop()()
+    async def _async_resume_schedule(self) -> None:
+        """Re-apply whatever the schedule asks for right now."""
+        if not self.enabled:
+            return
+        self._last_applied = _UNSET
+        await self._async_handle_block(self.active_block)
+
+    # ------------------------------------------------------------------
+    # Schedule application
+    # ------------------------------------------------------------------
 
     async def _async_schedule_changed(
         self, event: Event[EventStateChangedData]
@@ -277,6 +380,11 @@ class ScheduleManager:
         """Apply a block when it differs from the last applied one."""
         if not self.enabled:
             return
+        if self.override.active:
+            # A hold suppresses the schedule, but the block is still recorded
+            # so the right one is applied the moment the hold ends.
+            self._last_applied = block
+            return
         if not isinstance(self._last_applied, _Unset) and block == self._last_applied:
             return
 
@@ -285,11 +393,11 @@ class ScheduleManager:
 
     async def _async_apply(self, block: ScheduleBlock | None) -> None:
         """Send the climate commands for a block to the target entity."""
-        state = self.hass.states.get(self.target_entity_id)
+        state = self.hass.states.get(self.target.entity_id)
         if state is None or state.state in UNUSABLE_STATES:
             _LOGGER.debug(
                 "Deferring the schedule block for %s until it is available",
-                self.target_entity_id,
+                self.target.entity_id,
             )
             self._pending = block
             return
@@ -304,7 +412,7 @@ class ScheduleManager:
         if plan.issues:
             _LOGGER.warning(
                 "The schedule block for %s could not be fully applied: %s",
-                self.target_entity_id,
+                self.target.entity_id,
                 "; ".join(plan.issues),
             )
 
@@ -330,7 +438,8 @@ class ScheduleManager:
 
     async def async_handle_on(self, _now: datetime) -> None:
         """Turn the target on, used by the manual timer."""
-        state = self.hass.states.get(self.target_entity_id)
+        await self._async_clear_override_for_timer()
+        state = self.hass.states.get(self.target.entity_id)
         if state is None or state.state in UNUSABLE_STATES:
             return
 
@@ -340,10 +449,18 @@ class ScheduleManager:
 
     async def async_handle_off(self, _now: datetime) -> None:
         """Turn the target off, used by the manual timer."""
-        state = self.hass.states.get(self.target_entity_id)
+        await self._async_clear_override_for_timer()
+        state = self.hass.states.get(self.target.entity_id)
         if state is None or state.state in UNUSABLE_STATES:
             return
         await self.async_handle_off_state(state)
+
+    async def _async_clear_override_for_timer(self) -> None:
+        """Drop a hold when a timer fires; the timer is the newer intent."""
+        if self.override.active:
+            await self.override.async_clear()
+            self._last_applied = _UNSET
+            self._notify_listeners()
 
     async def async_handle_off_state(self, state: State) -> None:
         """Remember the active mode and turn the target off."""
@@ -355,8 +472,7 @@ class ScheduleManager:
 
     def _fallback_modes(self) -> tuple[str, ...]:
         """Return the preferred HVAC modes when a block does not specify one."""
-        configured = self.entry.options.get(CONF_DEFAULT_HVAC_MODE, DEFAULT_HVAC_MODE)
-        candidates = (self._last_active_hvac_mode, configured)
+        candidates = (self._last_active_hvac_mode, self.behavior.default_hvac_mode)
         return tuple(str(mode) for mode in candidates if mode is not None)
 
     async def _async_remember_active_mode(self, state: State) -> None:
@@ -380,32 +496,33 @@ class ScheduleManager:
         await self.hass.services.async_call(
             CLIMATE_DOMAIN,
             service,
-            {ATTR_ENTITY_ID: self.target_entity_id, **data},
+            {ATTR_ENTITY_ID: self.target.entity_id, **data},
             blocking=True,
         )
 
+    # ------------------------------------------------------------------
+    # Repairs
+    # ------------------------------------------------------------------
+
     def _issue_id(self, issue: str) -> str:
-        """Return the repair issue id for this config entry."""
-        return f"{issue}_{self.entry.entry_id}"
+        """Return the repair issue id for this target."""
+        return f"{issue}_{self.entry.entry_id}_{self.target.key}"
 
     @callback
     def _async_update_issues(self) -> None:
         """Create or resolve repair issues for the current configuration."""
-        placeholders = {"name": self.entry.title}
+        placeholders = {"name": self.target.name}
 
         self._async_set_issue(
             ISSUE_SCHEDULE_NOT_LINKED,
-            self.schedule_entity_id is None
-            and any(
-                self.entry.options.get(key)
-                for key in (CONF_LEGACY_ON_TIME, CONF_LEGACY_OFF_TIME)
-            ),
+            self._schedule_entity_id is None
+            and self._config.legacy_schedule is not None,
             placeholders,
         )
         self._async_set_issue(
             ISSUE_SCHEDULE_MISSING,
-            self.schedule_entity_id is not None and self.schedule_state is None,
-            {**placeholders, "entity_id": self.schedule_entity_id or ""},
+            self._schedule_entity_id is not None and self.schedule_state is None,
+            {**placeholders, "entity_id": self._schedule_entity_id or ""},
         )
         self._async_set_issue(
             ISSUE_BLOCK_UNSUPPORTED,
@@ -433,12 +550,6 @@ class ScheduleManager:
             translation_placeholders=placeholders,
         )
 
-    @callback
-    def _notify_listeners(self) -> None:
-        """Notify registered listeners that the schedule view changed."""
-        for listener in list(self._listeners):
-            listener()
-
 
 @callback
 def async_resolve_schedule_entity_id(
@@ -448,3 +559,10 @@ def async_resolve_schedule_entity_id(
     return er.async_get(hass).async_get_entity_id(
         SCHEDULE_DOMAIN, SCHEDULE_DOMAIN, schedule_id
     )
+
+
+__all__ = [
+    "OverrideState",
+    "TargetController",
+    "async_resolve_schedule_entity_id",
+]
