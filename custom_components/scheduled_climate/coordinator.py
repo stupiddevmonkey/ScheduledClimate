@@ -19,6 +19,7 @@ from .const import DOMAIN
 from .models import RoomConfig, TargetConfig
 from .plan import PlanSelector
 from .schedule import TARGET_ISSUES, TargetController
+from .visibility import async_hide_targets, async_unhide_targets
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -47,10 +48,31 @@ class RoomCoordinator:
     async def async_initialize(self) -> None:
         """Resolve the active plan and start every target controller."""
         self._async_clear_legacy_issues()
+        self._async_apply_target_visibility()
         await self.plans.async_initialize()
         self._unsub_plans = self.plans.async_add_listener(self._async_plan_changed)
         for key, controller in self.controllers.items():
             await controller.async_initialize(self.plans.schedule_entity_id(key))
+
+    @callback
+    def _async_apply_target_visibility(self) -> None:
+        """Hide or reveal the wrapped entities to match the configuration."""
+        entity_ids = [target.entity_id for target in self.config.targets]
+        if self.config.hide_targets:
+            async_hide_targets(self.hass, entity_ids)
+        else:
+            async_unhide_targets(self.hass, entity_ids)
+
+    @callback
+    def async_release_targets(self) -> None:
+        """Reveal every wrapped entity this room hid.
+
+        Called when the config entry is removed, so uninstalling the
+        integration never leaves a thermostat hidden with nothing wrapping it.
+        """
+        async_unhide_targets(
+            self.hass, [target.entity_id for target in self.config.targets]
+        )
 
     @callback
     def async_shutdown(self) -> None:

@@ -35,12 +35,14 @@ from .models import (
     OverrideConfig,
     PlanConfig,
     PlanSelectionConfig,
+    RoomConfig,
     TargetBehavior,
     TargetConfig,
     build_options,
     new_key,
     targets_as_data,
 )
+from .visibility import async_unhide_targets
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -184,7 +186,13 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
 
 async def async_remove_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
-    """Remove the dashboard resource once the last config entry is gone."""
+    """Reveal the wrapped entities and drop the dashboard resource."""
+    # The coordinator is already gone by now, so read the room straight from
+    # the entry. Uninstalling must never leave a thermostat hidden.
+    async_unhide_targets(
+        hass, [target.entity_id for target in RoomConfig.from_entry(entry).targets]
+    )
+
     other_entries = [
         candidate
         for candidate in hass.config_entries.async_entries(DOMAIN)

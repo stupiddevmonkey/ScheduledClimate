@@ -11,7 +11,7 @@ One config entry describes a **room**. A room can hold more than one climate ent
 - At least one existing `climate` entity to control
 - An administrator account to create or edit schedules
 
-Home Assistant restricts schedule helper edits to administrators, and that restriction cannot be lifted by an integration. Everyone else gets a read-only view of the week plus full use of holds, pause/resume, and timers — see [Holds](#place-a-temporary-hold).
+Home Assistant restricts schedule helper *edits* to administrators, and that restriction cannot be lifted by an integration. Reading a schedule is not restricted, so everyone else gets a read-only view of the week plus full use of holds, pause/resume, and timers — see [Holds](#place-a-temporary-hold).
 
 Local integration branding requires Home Assistant 2026.3 or newer. The integration registers its dashboard card automatically, so a separate Lovelace resource is not needed.
 
@@ -44,6 +44,8 @@ After upgrading either installation, restart Home Assistant and force-refresh op
 
 The integration creates a device for the room, one wrapper climate entity per target — normally with a `_scheduled` suffix such as `climate.living_room_scheduled` — a `select` entity for the active plan, and a plan named `Default`. It rejects missing targets, another Scheduled Climate wrapper, and a target already used by another Scheduled Climate room.
 
+The original climate entity is hidden once it is wrapped, so each thermostat appears once rather than twice. See [Why your thermostats disappear from pickers](#why-your-thermostats-disappear-from-pickers).
+
 To rename the room later, open **Settings > Devices & services > Scheduled Climate**, select the entry's three-dot menu, and choose **Reconfigure**. Climate entities are added, edited and removed from **Configure**. A wrapper follows its target when the target's entity ID is renamed in Home Assistant.
 
 ### Upgrading from a single-entity entry
@@ -65,12 +67,25 @@ Open **Settings > Devices & services > Scheduled Climate** and select **Configur
 | **Link a schedule helper** | Points one target *and* one plan at a schedule helper. |
 | **Plan selection** | Chooses whether the active plan is picked by hand or from an outdoor temperature sensor. |
 | **Holds** | Sets the default and maximum length of a temporary hold. |
+| **Wrapped entities** | Chooses whether the original climate entities stay visible. |
 
 Removing a target or deleting a plan never deletes the schedule helpers you own; only the link to them is dropped.
+
+### Why your thermostats disappear from pickers
+
+Each climate entity you add is mirrored by a Scheduled Climate entity — for example `climate.living_room` gains `climate.living_room_scheduled`. Leaving both visible would show every thermostat twice, so the original is **hidden** while Scheduled Climate wraps it. This is the same approach Home Assistant uses for its own `switch_as_x` helper.
+
+![Wrapped entities option](images/options-wrapped-entities.png)
+
+Hiding affects the user interface only. Automations, scripts, history and the REST and websocket APIs keep addressing the original entity exactly as before, and the wrapper forwards every command to it.
+
+The original becomes visible again automatically when you remove the target from the room or uninstall the integration. To keep both visible, turn off **Wrapped entities** in the options. An entity you hid yourself is left alone.
 
 ### Per-target schedule behaviour
 
 **Edit a climate entity** exposes these settings for the selected target.
+
+![Per-target schedule settings](images/options-target.png)
 
 | Setting | Behavior |
 | --- | --- |
@@ -110,6 +125,8 @@ data:
 ### Automatic selection from an outdoor temperature sensor
 
 Set **Plan selection** to *Follow an outdoor temperature sensor* and choose the sensor. Then give each plan the outdoor temperature at or above which it should take over. Plans form ascending bands, and the plan with no threshold is the base band used when it is colder than every other plan.
+
+![Plan selection settings](images/options-plan-selection.png)
 
 | Setting | Behavior |
 | --- | --- |
@@ -207,6 +224,8 @@ Select **Copy** to open the copy dialog:
 3. Optionally choose a different plan or target as the destination.
 4. Select **Copy**.
 
+![Copying a day to several days](images/copy-dialog.png)
+
 Merging reports any day where a block was dropped because it overlapped something already on that day. Each affected schedule helper is written once, no matter how many days were copied.
 
 Each block can contain the following data:
@@ -223,7 +242,7 @@ The editor only shows settings supported by the target entity. If a helper is ed
 
 When a block begins, its HVAC mode is applied before its setpoint. If the block omits `hvac_mode`, the integration restores the most recently active supported mode and otherwise uses **Default on mode**. When no block is active, **When no block is active** determines whether the target turns off or remains unchanged.
 
-Schedule editing requires a Home Assistant administrator because the schedule helper WebSocket API is administrator-only, and an integration cannot work around that. Other users can view the whole week but cannot add, duplicate, edit, delete, or copy blocks. They can still use holds, pause and resume the schedule, and run timers.
+Schedule editing requires a Home Assistant administrator, and an integration cannot work around that: the schedule helper's `create`, `update` and `delete` WebSocket commands are restricted to administrators by Home Assistant itself. Reading is not restricted, so other users see the whole week but cannot add, duplicate, edit, delete, or copy blocks. They can still use holds, pause and resume the schedule, and run timers.
 
 ## Place a temporary hold
 
@@ -233,6 +252,8 @@ A hold parks one target at settings of your choosing and suspends the schedule u
 2. Choose the settings to apply.
 3. Choose **Until the next scheduled change**, or a length of time.
 4. Select **Hold**.
+
+![Placing a temporary hold](images/hold-dialog.png)
 
 While a hold is running, the card shows when it ends and offers **Resume schedule**. When it lapses the integration immediately re-applies whatever the schedule asks for at that moment. Holds are persisted, so they survive a Home Assistant restart, and a hold that expired while Home Assistant was stopped is simply dropped.
 

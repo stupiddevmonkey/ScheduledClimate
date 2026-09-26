@@ -32,6 +32,7 @@ from homeassistant.helpers.selector import (
 from .const import (
     CONF_APPLY_ON_START,
     CONF_DEFAULT_HVAC_MODE,
+    CONF_HIDE_TARGETS,
     CONF_HYSTERESIS,
     CONF_OFF_BEHAVIOR,
     CONF_OUTDOOR_TEMP_ENTITY_ID,
@@ -63,6 +64,7 @@ from .models import (
     options_from_config,
     targets_as_data,
 )
+from .visibility import async_unhide_targets
 
 CONF_TARGET = "target"
 CONF_PLAN = "plan"
@@ -76,6 +78,7 @@ OPTIONS_MENU = (
     "link_schedule",
     "plan_selection",
     "override",
+    "visibility",
 )
 
 
@@ -424,6 +427,10 @@ class ScheduledClimateOptionsFlow(config_entries.OptionsFlow):
             data={**self.config_entry.data, CONF_TARGETS: targets_as_data(targets)},
         )
 
+        if updated.entity_id != target.entity_id:
+            # The old entity is no longer wrapped; the new one now is.
+            async_unhide_targets(self.hass, [target.entity_id])
+
         behaviors = dict(room.behaviors)
         behaviors[target.key] = TargetBehavior(
             schedule_enabled=user_input[CONF_SCHEDULE_ENABLED],
@@ -442,6 +449,9 @@ class ScheduledClimateOptionsFlow(config_entries.OptionsFlow):
             self.config_entry,
             data={**self.config_entry.data, CONF_TARGETS: targets_as_data(targets)},
         )
+
+        # Nothing wraps this entity any more, so it must become visible again.
+        async_unhide_targets(self.hass, [target.entity_id])
 
         behaviors = {
             key: behavior
@@ -775,4 +785,33 @@ class ScheduledClimateOptionsFlow(config_entries.OptionsFlow):
                 }
             ),
             errors=errors,
+        )
+
+    async def async_step_visibility(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Choose whether the wrapped climate entities stay visible.
+
+        Each target is mirrored by a wrapper entity, so leaving both visible
+        shows every thermostat twice. Hiding only affects the user interface;
+        automations, history and the APIs keep addressing the wrapped entity.
+        """
+        room = self.room
+
+        if user_input is not None:
+            return self.async_create_entry(
+                data=options_from_config(
+                    room, hide_targets=bool(user_input[CONF_HIDE_TARGETS])
+                )
+            )
+
+        return self.async_show_form(
+            step_id="visibility",
+            data_schema=vol.Schema(
+                {
+                    vol.Required(
+                        CONF_HIDE_TARGETS, default=room.hide_targets
+                    ): BooleanSelector()
+                }
+            ),
         )

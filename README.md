@@ -30,6 +30,8 @@ Add more climate entities, plans and schedule links afterwards from **Configure*
 
 The integration serves and registers its dashboard card automatically. A separate frontend download or Lovelace resource is not required.
 
+Each climate entity you add is mirrored by a Scheduled Climate entity, and the original is hidden while it is wrapped so thermostats do not appear twice. Hiding is a user-interface concern only — automations, history and the APIs keep using the original entity — and it is reversed if you remove the target or uninstall the integration. Turn off **Wrapped entities** in the options to keep both visible.
+
 ![Add Scheduled Climate configuration flow](docs/images/integration-setup.png)
 
 ## Dashboard Card
@@ -61,7 +63,7 @@ The card itself stays compact — room name, active plan, next change, target sw
 
 The `layout` option accepts `standard` (the default) or `compact`. Compact layout removes the circular temperature dial while retaining touch-friendly temperature and HVAC controls. Optional sections can each be collapsed; their states are retained per entity in the current browser.
 
-Set `schedule_editable: false` to render the schedule read-only. Editing is always read-only for non-administrators, because the schedule helper websocket API requires administrator rights. `default_schedule_day` selects the day shown first, and `default_plan` the plan shown first; the current day and the active plan are used when they are omitted.
+Set `schedule_editable: false` to render the schedule read-only. Editing is always read-only for non-administrators, because Home Assistant restricts the schedule helper's create, update and delete WebSocket commands to administrators. `default_schedule_day` selects the day shown first, and `default_plan` the plan shown first; the current day and the active plan are used when they are omitted.
 
 ![Compact Scheduled Climate dashboard card](docs/images/dashboard-compact-mobile.png)
 

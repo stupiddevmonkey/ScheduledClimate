@@ -248,14 +248,16 @@ export class ScheduledClimateOverrideDialog extends LitElement {
             : nothing}
 
           ${this._error ? html`<p class="error" role="alert">${this._error}</p>` : nothing}
-        </div>
 
-        ${overrideActive
-          ? html`<button slot="secondaryAction" ?disabled=${this._busy} @click=${this._resume}>Resume schedule</button>`
-          : html`<button slot="secondaryAction" @click=${this._close}>Cancel</button>`}
-        <button slot="primaryAction" class="primary" ?disabled=${this._busy} @click=${this._confirm}>
-          Hold
-        </button>
+          <div class="dialog-actions">
+            ${overrideActive
+              ? html`<button ?disabled=${this._busy} @click=${this._resume}>Resume schedule</button>`
+              : html`<button @click=${this._close}>Cancel</button>`}
+            <button class="primary" ?disabled=${this._busy} @click=${this._confirm}>
+              Hold
+            </button>
+          </div>
+        </div>
       </ha-dialog>
     `;
   }

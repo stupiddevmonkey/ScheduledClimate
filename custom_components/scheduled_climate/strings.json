@@ -36,7 +36,8 @@
           "edit_plan": "Edit a plan",
           "link_schedule": "Link a schedule helper",
           "plan_selection": "How the active plan is chosen",
-          "override": "Holds"
+          "override": "Holds",
+          "visibility": "Wrapped entities"
         }
       },
       "add_target": {
@@ -111,6 +112,13 @@
         "data": {
           "default_minutes": "Default hold length",
           "max_minutes": "Longest hold allowed"
+        }
+      },
+      "visibility": {
+        "title": "Wrapped entities",
+        "description": "Each climate entity in this room is mirrored by a Scheduled Climate entity. Hiding the original keeps each thermostat from appearing twice in pickers, voice assistants and auto-generated dashboards. Hiding only affects the user interface: automations, scripts, history and the APIs keep using the original entity.",
+        "data": {
+          "hide_targets": "Hide the original climate entities"
         }
       }
     },

@@ -200,17 +200,18 @@ export class ScheduledClimateCopyDialog extends LitElement {
                 </label>
               `
             : nothing}
-        </div>
 
-        <button slot="secondaryAction" @click=${this._close}>Cancel</button>
-        <button
-          slot="primaryAction"
-          class="primary"
-          ?disabled=${this._selected.size === 0}
-          @click=${this._confirm}
-        >
-          Copy
-        </button>
+          <div class="dialog-actions">
+            <button @click=${this._close}>Cancel</button>
+            <button
+              class="primary"
+              ?disabled=${this._selected.size === 0}
+              @click=${this._confirm}
+            >
+              Copy
+            </button>
+          </div>
+        </div>
       </ha-dialog>
     `;
   }

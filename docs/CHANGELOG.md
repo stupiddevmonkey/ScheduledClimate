@@ -4,7 +4,17 @@ All notable changes to Scheduled Climate are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
-## [1.2.0] - 2026-09-21
+## [Unreleased]
+
+### Changed
+
+- **The wrapped climate entities are now hidden by default.** Each target is mirrored by a Scheduled Climate entity, so leaving both visible showed every thermostat twice in entity pickers, voice assistants and auto-generated dashboards. The original entity is now hidden while a wrapper exists, matching how Home Assistant's own `switch_as_x` integration handles wrapped entities. Hiding affects the user interface only — automations, scripts, history and the REST and websocket APIs keep addressing the original entity exactly as before. The original is revealed again if the target is removed from the room, if the integration is uninstalled, or if you turn the new **Wrapped entities** option off. An entity you hid yourself is never touched.
+
+### Fixed
+
+- The schedule, copy and hold dialogs rendered their action buttons through Home Assistant's `primaryAction` and `secondaryAction` dialog slots, which current releases no longer render. The buttons collapsed to zero size, so **a hold or a day copy could not be confirmed from the dashboard at all**. Every dialog action is now drawn inside the dialog body.
+
+## [2.0.0] - 2026-09-21
 
 ### Added
 

@@ -25,6 +25,15 @@ export const dialogStyles = css`
     font-weight: 500;
     color: var(--primary-text-color);
   }
+  /* Actions live inside the content rather than in ha-dialog's action slots,
+     which current Home Assistant releases no longer render. */
+  .dialog-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    padding-top: 8px;
+    border-top: 1px solid var(--divider-color, rgba(0, 0, 0, 0.12));
+  }
   h4 {
     margin: 0;
     font-size: var(--ha-font-size-m, 14px);

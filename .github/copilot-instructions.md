@@ -282,6 +282,7 @@ When issues can be detected automatically, prefer Repairs over logging alone.
 ## Tests
 
 Every feature must include tests.
+If docker is running, ensure that full integration tests are executed within the appropriate container environment.
 
 ### Minimum Expectations
 
@@ -337,6 +338,11 @@ Generated code should pass:
 * Home Assistant linting
 * Pytest
 * Type checking
+
+## Documentation
+
+* All new features and changes must be documented in the appropriate sections of the project documentation. Include usage examples and configuration instructions where applicable.
+* Any element that is documented and has a corresponding UI element should include a screenshot or visual reference in the documentation. Add helping text or annotations to the screenshot where necessary to clarify usage.
 
 ## Changelog
 

@@ -35,7 +35,7 @@ const zt = (r) => new Et(typeof r == "string" ? r : r + "", void 0, at), P = (r,
   for (const s of t.cssRules) e += s.cssText;
   return zt(e);
 })(r) : r;
-const { is: It, defineProperty: Ht, getOwnPropertyDescriptor: Nt, getOwnPropertyNames: Rt, getOwnPropertySymbols: Bt, getPrototypeOf: Lt } = Object, q = globalThis, ht = q.trustedTypes, jt = ht ? ht.emptyScript : "", Vt = q.reactiveElementPolyfillSupport, M = (r, t) => r, G = { toAttribute(r, t) {
+const { is: Ht, defineProperty: It, getOwnPropertyDescriptor: Nt, getOwnPropertyNames: Rt, getOwnPropertySymbols: Bt, getPrototypeOf: Lt } = Object, q = globalThis, ht = q.trustedTypes, jt = ht ? ht.emptyScript : "", Vt = q.reactiveElementPolyfillSupport, M = (r, t) => r, G = { toAttribute(r, t) {
   switch (t) {
     case Boolean:
       r = r ? jt : null;
@@ -63,7 +63,7 @@ const { is: It, defineProperty: Ht, getOwnPropertyDescriptor: Nt, getOwnProperty
       }
   }
   return e;
-} }, Tt = (r, t) => !It(r, t), pt = { attribute: !0, type: String, converter: G, reflect: !1, useDefault: !1, hasChanged: Tt };
+} }, Tt = (r, t) => !Ht(r, t), pt = { attribute: !0, type: String, converter: G, reflect: !1, useDefault: !1, hasChanged: Tt };
 Symbol.metadata ??= /* @__PURE__ */ Symbol("metadata"), q.litPropertyMetadata ??= /* @__PURE__ */ new WeakMap();
 let E = class extends HTMLElement {
   static addInitializer(t) {
@@ -75,7 +75,7 @@ let E = class extends HTMLElement {
   static createProperty(t, e = pt) {
     if (e.state && (e.attribute = !1), this._$Ei(), this.prototype.hasOwnProperty(t) && ((e = Object.create(e)).wrapped = !0), this.elementProperties.set(t, e), !e.noAccessor) {
       const s = /* @__PURE__ */ Symbol(), i = this.getPropertyDescriptor(t, s, e);
-      i !== void 0 && Ht(this.prototype, t, i);
+      i !== void 0 && It(this.prototype, t, i);
     }
   }
   static getPropertyDescriptor(t, e, s) {
@@ -247,7 +247,7 @@ let E = class extends HTMLElement {
   }
 };
 E.elementStyles = [], E.shadowRootOptions = { mode: "open" }, E[M("elementProperties")] = /* @__PURE__ */ new Map(), E[M("finalized")] = /* @__PURE__ */ new Map(), Vt?.({ ReactiveElement: E }), (q.reactiveElementVersions ??= []).push("2.1.2");
-const rt = globalThis, ut = (r) => r, L = rt.trustedTypes, mt = L ? L.createPolicy("lit-html", { createHTML: (r) => r }) : void 0, Ct = "$lit$", v = `lit$${Math.random().toFixed(9).slice(2)}$`, Pt = "?" + v, Wt = `<${Pt}>`, S = document, z = () => S.createComment(""), U = (r) => r === null || typeof r != "object" && typeof r != "function", ot = Array.isArray, Kt = (r) => ot(r) || typeof r?.[Symbol.iterator] == "function", J = `[ 	
+const rt = globalThis, ut = (r) => r, L = rt.trustedTypes, mt = L ? L.createPolicy("lit-html", { createHTML: (r) => r }) : void 0, Ct = "$lit$", y = `lit$${Math.random().toFixed(9).slice(2)}$`, Pt = "?" + y, Wt = `<${Pt}>`, S = document, z = () => S.createComment(""), U = (r) => r === null || typeof r != "object" && typeof r != "function", ot = Array.isArray, Kt = (r) => ot(r) || typeof r?.[Symbol.iterator] == "function", J = `[ 	
 \f\r]`, O = /<(?:(!--|\/[^a-zA-Z])|(\/?[a-zA-Z][^>\s]*)|(\/?$))/g, _t = /-->/g, gt = />/g, x = RegExp(`>|${J}(?:([^\\s"'>=/]+)(${J}*=${J}*(?:[^ 	
 \f\r"'\`<>=]|("|')|))|$)`, "g"), ft = /'/g, bt = /"/g, Ot = /^(?:script|style|textarea|title)$/i, Ft = (r) => (t, ...e) => ({ _$litType$: r, strings: t, values: e }), l = Ft(1), T = /* @__PURE__ */ Symbol.for("lit-noChange"), c = /* @__PURE__ */ Symbol.for("lit-nothing"), $t = /* @__PURE__ */ new WeakMap(), w = S.createTreeWalker(S, 129);
 function Mt(r, t) {
@@ -261,39 +261,39 @@ const qt = (r, t) => {
     const d = r[o];
     let u, h, p = -1, _ = 0;
     for (; _ < d.length && (n.lastIndex = _, h = n.exec(d), h !== null); ) _ = n.lastIndex, n === O ? h[1] === "!--" ? n = _t : h[1] !== void 0 ? n = gt : h[2] !== void 0 ? (Ot.test(h[2]) && (i = RegExp("</" + h[2], "g")), n = x) : h[3] !== void 0 && (n = x) : n === x ? h[0] === ">" ? (n = i ?? O, p = -1) : h[1] === void 0 ? p = -2 : (p = n.lastIndex - h[2].length, u = h[1], n = h[3] === void 0 ? x : h[3] === '"' ? bt : ft) : n === bt || n === ft ? n = x : n === _t || n === gt ? n = O : (n = x, i = void 0);
-    const y = n === x && r[o + 1].startsWith("/>") ? " " : "";
-    a += n === O ? d + Wt : p >= 0 ? (s.push(u), d.slice(0, p) + Ct + d.slice(p) + v + y) : d + v + (p === -2 ? o : y);
+    const v = n === x && r[o + 1].startsWith("/>") ? " " : "";
+    a += n === O ? d + Wt : p >= 0 ? (s.push(u), d.slice(0, p) + Ct + d.slice(p) + y + v) : d + y + (p === -2 ? o : v);
   }
   return [Mt(r, a + (r[e] || "<?>") + (t === 2 ? "</svg>" : t === 3 ? "</math>" : "")), s];
 };
-class I {
+class H {
   constructor({ strings: t, _$litType$: e }, s) {
     let i;
     this.parts = [];
     let a = 0, n = 0;
     const o = t.length - 1, d = this.parts, [u, h] = qt(t, e);
-    if (this.el = I.createElement(u, s), w.currentNode = this.el.content, e === 2 || e === 3) {
+    if (this.el = H.createElement(u, s), w.currentNode = this.el.content, e === 2 || e === 3) {
       const p = this.el.content.firstChild;
       p.replaceWith(...p.childNodes);
     }
     for (; (i = w.nextNode()) !== null && d.length < o; ) {
       if (i.nodeType === 1) {
         if (i.hasAttributes()) for (const p of i.getAttributeNames()) if (p.endsWith(Ct)) {
-          const _ = h[n++], y = i.getAttribute(p).split(v), N = /([.?@])?(.*)/.exec(_);
-          d.push({ type: 1, index: a, name: N[2], strings: y, ctor: N[1] === "." ? Jt : N[1] === "?" ? Zt : N[1] === "@" ? Gt : Y }), i.removeAttribute(p);
-        } else p.startsWith(v) && (d.push({ type: 6, index: a }), i.removeAttribute(p));
+          const _ = h[n++], v = i.getAttribute(p).split(y), N = /([.?@])?(.*)/.exec(_);
+          d.push({ type: 1, index: a, name: N[2], strings: v, ctor: N[1] === "." ? Jt : N[1] === "?" ? Zt : N[1] === "@" ? Gt : Y }), i.removeAttribute(p);
+        } else p.startsWith(y) && (d.push({ type: 6, index: a }), i.removeAttribute(p));
         if (Ot.test(i.tagName)) {
-          const p = i.textContent.split(v), _ = p.length - 1;
+          const p = i.textContent.split(y), _ = p.length - 1;
           if (_ > 0) {
             i.textContent = L ? L.emptyScript : "";
-            for (let y = 0; y < _; y++) i.append(p[y], z()), w.nextNode(), d.push({ type: 2, index: ++a });
+            for (let v = 0; v < _; v++) i.append(p[v], z()), w.nextNode(), d.push({ type: 2, index: ++a });
             i.append(p[_], z());
           }
         }
       } else if (i.nodeType === 8) if (i.data === Pt) d.push({ type: 2, index: a });
       else {
         let p = -1;
-        for (; (p = i.data.indexOf(v, p + 1)) !== -1; ) d.push({ type: 7, index: a }), p += v.length - 1;
+        for (; (p = i.data.indexOf(y, p + 1)) !== -1; ) d.push({ type: 7, index: a }), p += y.length - 1;
       }
       a++;
     }
@@ -326,7 +326,7 @@ class Yt {
     for (; d !== void 0; ) {
       if (n === d.index) {
         let u;
-        d.type === 2 ? u = new H(a, a.nextSibling, this, t) : d.type === 1 ? u = new d.ctor(a, d.name, d.strings, this, t) : d.type === 6 && (u = new Xt(a, this, t)), this._$AV.push(u), d = s[++o];
+        d.type === 2 ? u = new I(a, a.nextSibling, this, t) : d.type === 1 ? u = new d.ctor(a, d.name, d.strings, this, t) : d.type === 6 && (u = new Xt(a, this, t)), this._$AV.push(u), d = s[++o];
       }
       n !== d?.index && (a = w.nextNode(), n++);
     }
@@ -337,7 +337,7 @@ class Yt {
     for (const s of this._$AV) s !== void 0 && (s.strings !== void 0 ? (s._$AI(t, s, e), e += s.strings.length - 2) : s._$AI(t[e])), e++;
   }
 }
-class H {
+class I {
   get _$AU() {
     return this._$AM?._$AU ?? this._$Cv;
   }
@@ -368,7 +368,7 @@ class H {
     this._$AH !== c && U(this._$AH) ? this._$AA.nextSibling.data = t : this.T(S.createTextNode(t)), this._$AH = t;
   }
   $(t) {
-    const { values: e, _$litType$: s } = t, i = typeof s == "number" ? this._$AC(t) : (s.el === void 0 && (s.el = I.createElement(Mt(s.h, s.h[0]), this.options)), s);
+    const { values: e, _$litType$: s } = t, i = typeof s == "number" ? this._$AC(t) : (s.el === void 0 && (s.el = H.createElement(Mt(s.h, s.h[0]), this.options)), s);
     if (this._$AH?._$AD === i) this._$AH.p(e);
     else {
       const a = new Yt(i, this), n = a.u(this.options);
@@ -377,13 +377,13 @@ class H {
   }
   _$AC(t) {
     let e = $t.get(t.strings);
-    return e === void 0 && $t.set(t.strings, e = new I(t)), e;
+    return e === void 0 && $t.set(t.strings, e = new H(t)), e;
   }
   k(t) {
     ot(this._$AH) || (this._$AH = [], this._$AR());
     const e = this._$AH;
     let s, i = 0;
-    for (const a of t) i === e.length ? e.push(s = new H(this.O(z()), this.O(z()), this, this.options)) : s = e[i], s._$AI(a), i++;
+    for (const a of t) i === e.length ? e.push(s = new I(this.O(z()), this.O(z()), this, this.options)) : s = e[i], s._$AI(a), i++;
     i < e.length && (this._$AR(s && s._$AB.nextSibling, i), e.length = i);
   }
   _$AR(t = this._$AA.nextSibling, e) {
@@ -462,13 +462,13 @@ class Xt {
   }
 }
 const Qt = rt.litHtmlPolyfillSupport;
-Qt?.(I, H), (rt.litHtmlVersions ??= []).push("3.3.3");
+Qt?.(H, I), (rt.litHtmlVersions ??= []).push("3.3.3");
 const te = (r, t, e) => {
   const s = e?.renderBefore ?? t;
   let i = s._$litPart$;
   if (i === void 0) {
     const a = e?.renderBefore ?? null;
-    s._$litPart$ = i = new H(t.insertBefore(z(), a), a, void 0, e ?? {});
+    s._$litPart$ = i = new I(t.insertBefore(z(), a), a, void 0, e ?? {});
   }
   return i._$AI(r), i;
 };
@@ -516,7 +516,7 @@ const b = [
   saturday: "Sat",
   sunday: "Sun"
 };
-function yt(r = /* @__PURE__ */ new Date()) {
+function vt(r = /* @__PURE__ */ new Date()) {
   return b[(r.getDay() + 6) % 7];
 }
 function se() {
@@ -539,7 +539,7 @@ function m(r, t = !1) {
   const [e, s] = f(r).split(":").map(Number), i = e * 60 + s;
   return t && i === 0 ? 1440 : i;
 }
-function vt(r, t = !1) {
+function yt(r, t = !1) {
   return t && m(r, !0) === 1440 ? "24:00:00" : `${f(r)}:00`;
 }
 function g(r) {
@@ -557,8 +557,8 @@ function xt(r) {
   const a = g(r.humidity);
   a !== void 0 && (t.humidity = a);
   const n = {
-    from: vt(r.from),
-    to: vt(r.to, !0)
+    from: yt(r.from),
+    to: yt(r.to, !0)
   };
   return Object.keys(t).length > 0 && (n.data = t), n;
 }
@@ -873,6 +873,15 @@ const lt = P`
     font-weight: 500;
     color: var(--primary-text-color);
   }
+  /* Actions live inside the content rather than in ha-dialog's action slots,
+     which current Home Assistant releases no longer render. */
+  .dialog-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    padding-top: 8px;
+    border-top: 1px solid var(--divider-color, rgba(0, 0, 0, 0.12));
+  }
   h4 {
     margin: 0;
     font-size: var(--ha-font-size-m, 14px);
@@ -1112,17 +1121,18 @@ const lt = P`
                   </select>
                 </label>
               ` : c}
-        </div>
 
-        <button slot="secondaryAction" @click=${this._close}>Cancel</button>
-        <button
-          slot="primaryAction"
-          class="primary"
-          ?disabled=${this._selected.size === 0}
-          @click=${this._confirm}
-        >
-          Copy
-        </button>
+          <div class="dialog-actions">
+            <button @click=${this._close}>Cancel</button>
+            <button
+              class="primary"
+              ?disabled=${this._selected.size === 0}
+              @click=${this._confirm}
+            >
+              Copy
+            </button>
+          </div>
+        </div>
       </ha-dialog>
     `;
   }
@@ -1153,7 +1163,7 @@ customElements.get("scheduled-climate-copy-dialog") || customElements.define(
 );
 const W = class W extends $ {
   constructor() {
-    super(...arguments), this.open = !1, this._selectedTarget = "", this._selectedPlan = "", this._selectedDay = yt(), this._schedules = [], this._error = "", this._warning = "", this._busy = !1, this._loading = !1, this._copyOpen = !1, this._wasOpen = !1;
+    super(...arguments), this.open = !1, this._selectedTarget = "", this._selectedPlan = "", this._selectedDay = vt(), this._schedules = [], this._error = "", this._warning = "", this._busy = !1, this._loading = !1, this._copyOpen = !1, this._wasOpen = !1;
   }
   disconnectedCallback() {
     super.disconnectedCallback(), this._unsubscribe?.(), this._unsubscribe = void 0;
@@ -1165,7 +1175,7 @@ const W = class W extends $ {
     const t = this._roomEntities();
     this._selectedTarget = this.initialTarget && t.includes(this.initialTarget) ? this.initialTarget : this.entityId ?? t[0] ?? "";
     const e = this._planOptions(this._selectedTarget), s = this._targetState()?.attributes.active_plan ?? void 0;
-    this._selectedPlan = this.initialPlan && e.includes(this.initialPlan) ? this.initialPlan : s && e.includes(s) ? s : e[0] ?? "", this._selectedDay = yt(), this._draft = void 0, this._error = "", this._warning = "", this._subscribe();
+    this._selectedPlan = this.initialPlan && e.includes(this.initialPlan) ? this.initialPlan : s && e.includes(s) ? s : e[0] ?? "", this._selectedDay = vt(), this._draft = void 0, this._error = "", this._warning = "", this._subscribe();
   }
   get _isAdmin() {
     return this.hass?.user?.is_admin === !0;
@@ -1526,9 +1536,11 @@ const W = class W extends $ {
 
           ${this._error ? l`<p class="error" role="alert">${this._error}</p>` : c}
           ${this._warning ? l`<p class="warning" role="status">${this._warning}</p>` : c}
-        </div>
 
-        <button slot="primaryAction" @click=${this._close}>Close</button>
+          <div class="dialog-actions">
+            <button @click=${this._close}>Close</button>
+          </div>
+        </div>
       </ha-dialog>
       <scheduled-climate-copy-dialog
         .hass=${this.hass}
@@ -1860,12 +1872,14 @@ const K = class K extends $ {
               ` : c}
 
           ${this._error ? l`<p class="error" role="alert">${this._error}</p>` : c}
-        </div>
 
-        ${a ? l`<button slot="secondaryAction" ?disabled=${this._busy} @click=${this._resume}>Resume schedule</button>` : l`<button slot="secondaryAction" @click=${this._close}>Cancel</button>`}
-        <button slot="primaryAction" class="primary" ?disabled=${this._busy} @click=${this._confirm}>
-          Hold
-        </button>
+          <div class="dialog-actions">
+            ${a ? l`<button ?disabled=${this._busy} @click=${this._resume}>Resume schedule</button>` : l`<button @click=${this._close}>Cancel</button>`}
+            <button class="primary" ?disabled=${this._busy} @click=${this._confirm}>
+              Hold
+            </button>
+          </div>
+        </div>
       </ha-dialog>
     `;
   }

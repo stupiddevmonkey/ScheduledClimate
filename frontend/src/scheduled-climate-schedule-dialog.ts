@@ -597,9 +597,11 @@ export class ScheduledClimateScheduleDialog extends LitElement {
 
           ${this._error ? html`<p class="error" role="alert">${this._error}</p>` : nothing}
           ${this._warning ? html`<p class="warning" role="status">${this._warning}</p>` : nothing}
-        </div>
 
-        <button slot="primaryAction" @click=${this._close}>Close</button>
+          <div class="dialog-actions">
+            <button @click=${this._close}>Close</button>
+          </div>
+        </div>
       </ha-dialog>
       <scheduled-climate-copy-dialog
         .hass=${this.hass}

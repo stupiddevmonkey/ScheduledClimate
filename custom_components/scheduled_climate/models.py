@@ -19,6 +19,7 @@ from homeassistant.util.ulid import ulid_now
 from .const import (
     CONF_APPLY_ON_START,
     CONF_DEFAULT_HVAC_MODE,
+    CONF_HIDE_TARGETS,
     CONF_HYSTERESIS,
     CONF_LEGACY_OFF_TIME,
     CONF_LEGACY_ON_TIME,
@@ -42,6 +43,7 @@ from .const import (
     CONF_TARGET_NAME,
     CONF_TARGETS,
     DEFAULT_APPLY_ON_START,
+    DEFAULT_HIDE_TARGETS,
     DEFAULT_HVAC_MODE,
     DEFAULT_HYSTERESIS,
     DEFAULT_OFF_BEHAVIOR,
@@ -327,6 +329,7 @@ class RoomConfig:
     plans: tuple[PlanConfig, ...] = ()
     plan_selection: PlanSelectionConfig = field(default_factory=PlanSelectionConfig)
     override: OverrideConfig = field(default_factory=OverrideConfig)
+    hide_targets: bool = DEFAULT_HIDE_TARGETS
     legacy_on_time: str | None = None
     legacy_off_time: str | None = None
 
@@ -363,6 +366,7 @@ class RoomConfig:
                 options.get(CONF_PLAN_SELECTION)
             ),
             override=OverrideConfig.from_dict(options.get(CONF_OVERRIDE)),
+            hide_targets=bool(options.get(CONF_HIDE_TARGETS, DEFAULT_HIDE_TARGETS)),
             legacy_on_time=legacy_on if isinstance(legacy_on, str) else None,
             legacy_off_time=legacy_off if isinstance(legacy_off, str) else None,
         )
@@ -452,6 +456,7 @@ def build_options(
     plans: Sequence[PlanConfig],
     plan_selection: PlanSelectionConfig,
     override: OverrideConfig,
+    hide_targets: bool = DEFAULT_HIDE_TARGETS,
     legacy_on_time: str | None = None,
     legacy_off_time: str | None = None,
 ) -> dict[str, Any]:
@@ -461,6 +466,7 @@ def build_options(
         CONF_PLANS: plans_as_options(plans),
         CONF_PLAN_SELECTION: plan_selection.as_dict(),
         CONF_OVERRIDE: override.as_dict(),
+        CONF_HIDE_TARGETS: hide_targets,
     }
     if legacy_on_time:
         options[CONF_LEGACY_ON_TIME] = legacy_on_time
@@ -476,6 +482,7 @@ def options_from_config(
     plans: Sequence[PlanConfig] | None = None,
     plan_selection: PlanSelectionConfig | None = None,
     override: OverrideConfig | None = None,
+    hide_targets: bool | None = None,
 ) -> dict[str, Any]:
     """Return an options payload with selected parts of a room replaced."""
     return build_options(
@@ -485,6 +492,7 @@ def options_from_config(
             config.plan_selection if plan_selection is None else plan_selection
         ),
         override=config.override if override is None else override,
+        hide_targets=(config.hide_targets if hide_targets is None else hide_targets),
         legacy_on_time=config.legacy_on_time,
         legacy_off_time=config.legacy_off_time,
     )

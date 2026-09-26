@@ -116,9 +116,15 @@ function overrideDialog(
 
 beforeEach(() => {
   localStorage.clear();
+  // The schedule dialog opens on today, and the fixtures only define Monday
+  // blocks, so pin the clock. Without this the suite passes Mon-Fri and fails
+  // at the weekend.
+  vi.useFakeTimers({ shouldAdvanceTime: true });
+  vi.setSystemTime(new Date("2026-08-03T09:00:00"));
 });
 
 afterEach(() => {
+  vi.useRealTimers();
   document.body.replaceChildren();
   localStorage.clear();
 });
@@ -444,6 +450,47 @@ describe("scheduled-climate-card", () => {
       const type = (call[0] as Record<string, unknown>).type;
       expect(type).toBe("schedule/list");
     }
+  });
+
+  it("renders dialog actions inside the content, not in ha-dialog slots", async () => {
+    // Home Assistant's ha-dialog no longer renders the MWC-era
+    // primaryAction/secondaryAction slots, so slotted buttons collapse to
+    // zero size and the user cannot confirm anything. Every action must live
+    // inside the dialog content instead.
+    const callWS = vi.fn().mockResolvedValue([schedule()]);
+    const { card } = await renderCard(
+      state({
+        plan_options: ["Comfort"],
+        active_plan: "Comfort",
+        plan_schedules: { Comfort: SCHEDULE_ID },
+      }),
+      undefined,
+      callWS,
+    );
+
+    button(card.shadowRoot!, "Hold").click();
+    await card.updateComplete;
+    const hold = overrideDialog(card);
+    await hold.updateComplete;
+
+    const holdActions = hold.shadowRoot!.querySelector(".dialog-actions");
+    expect(holdActions).not.toBeNull();
+    expect(holdActions!.textContent).toContain("Hold");
+    expect(hold.shadowRoot!.querySelectorAll("button[slot]")).toHaveLength(0);
+
+    button(card.shadowRoot!, "Edit schedule").click();
+    await card.updateComplete;
+    const dialog = scheduleDialog(card);
+    await dialog.updateComplete;
+    await vi.waitFor(() =>
+      expect(callWS).toHaveBeenCalledWith({ type: "schedule/list" }),
+    );
+    await dialog.updateComplete;
+
+    const scheduleActions = dialog.shadowRoot!.querySelector(".dialog-actions");
+    expect(scheduleActions).not.toBeNull();
+    expect(scheduleActions!.textContent).toContain("Close");
+    expect(dialog.shadowRoot!.querySelectorAll("button[slot]")).toHaveLength(0);
   });
 
   it("shows service failures and unavailable state", async () => {
