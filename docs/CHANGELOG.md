@@ -18,6 +18,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - Target chips on the card, and the target tabs in the schedule and copy dialogs, repeated the room name on every entry — a room called `Family Room Climate Schedule` produced chips reading `Family Room Climate Schedule Minisplit`, which truncated and hid the part that actually distinguishes them. The wrapper entity now publishes a `target_name` attribute holding just the target's own name, and the card uses it.
 - The schedule, copy and hold dialogs rendered their action buttons through Home Assistant's `primaryAction` and `secondaryAction` dialog slots, which current releases no longer render. The buttons collapsed to zero size, so **a hold or a day copy could not be confirmed from the dashboard at all**. Every dialog action is now drawn inside the dialog body.
+- The card test suite opened the schedule editor on the current day but only defined blocks for Monday, so it passed from Monday to Friday and failed at the weekend. The clock is now pinned.
+
+### Dependencies
+
+- Bumped `vitest` and `@vitest/mocker` from 3.2.7 to 5.0.1 (#4).
 
 ## [2.0.0] - 2026-09-21
 
