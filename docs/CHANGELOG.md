@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+
+- **Plans can now name an upper outdoor temperature bound.** A plan previously could only say "activate at or above this temperature", so a cold-weather plan such as frost protection could only be expressed indirectly by putting thresholds on every *other* plan. A plan can now name a lower bound, an upper bound, both, or neither: `below 2` for a frost plan, `8` to `16` for a shoulder-season plan, and no bounds for the room's fallback. Bands are half open, so neighbours sharing a boundary never overlap, and where bands do overlap the more specific one wins. The hysteresis dead zone applies to both ends of a band. Existing plans are unaffected — a plan with only a lower bound behaves exactly as before.
+
 ### Changed
 
 - **The wrapped climate entities are now hidden by default.** Each target is mirrored by a Scheduled Climate entity, so leaving both visible showed every thermostat twice in entity pickers, voice assistants and auto-generated dashboards. The original entity is now hidden while a wrapper exists, matching how Home Assistant's own `switch_as_x` integration handles wrapped entities. Hiding affects the user interface only — automations, scripts, history and the REST and websocket APIs keep addressing the original entity exactly as before. The original is revealed again if the target is removed from the room, if the integration is uninstalled, or if you turn the new **Wrapped entities** option off. An entity you hid yourself is never touched.

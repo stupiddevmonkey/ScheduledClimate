@@ -70,8 +70,10 @@
         "data": {
           "name": "Plan name",
           "icon": "Icon",
-          "min_outdoor_temp": "Activate at or above this outdoor temperature"
-        }
+          "min_outdoor_temp": "Activate at or above this outdoor temperature",
+          "max_outdoor_temp": "Activate below this outdoor temperature"
+        },
+        "description": "Leave both temperatures empty for the plan that applies whenever no other plan matches. Set only the lower bound for a warm-weather plan, only the upper bound for a cold-weather plan, or both to limit the plan to a band."
       },
       "edit_plan": {
         "title": "Edit a plan",
@@ -85,8 +87,10 @@
           "name": "Plan name",
           "icon": "Icon",
           "min_outdoor_temp": "Activate at or above this outdoor temperature",
-          "remove": "Delete this plan"
-        }
+          "remove": "Delete this plan",
+          "max_outdoor_temp": "Activate below this outdoor temperature"
+        },
+        "description": "Leave both temperatures empty for the plan that applies whenever no other plan matches. Set only the lower bound for a warm-weather plan, only the upper bound for a cold-weather plan, or both to limit the plan to a band."
       },
       "link_schedule": {
         "title": "Link a schedule helper",
@@ -131,7 +135,8 @@
       "last_plan": "A room needs at least one plan",
       "schedule_not_found": "The selected schedule helper does not exist",
       "outdoor_sensor_required": "Select an outdoor temperature sensor to choose plans automatically",
-      "override_bounds": "The default hold must not be longer than the longest hold allowed"
+      "override_bounds": "The default hold must not be longer than the longest hold allowed",
+      "plan_band_inverted": "The lower temperature must be below the upper temperature"
     },
     "abort": {
       "no_targets": "Add a climate entity to this room first",

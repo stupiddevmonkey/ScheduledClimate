@@ -39,6 +39,7 @@ from .const import (
     CONF_OVERRIDE_DEFAULT_MINUTES,
     CONF_OVERRIDE_MAX_MINUTES,
     CONF_PLAN_ICON,
+    CONF_PLAN_MAX_OUTDOOR_TEMP,
     CONF_PLAN_MIN_OUTDOOR_TEMP,
     CONF_PLAN_SELECTION_MODE,
     CONF_SCHEDULE_ENABLED,
@@ -131,6 +132,13 @@ def _target_error(
             return "target_already_configured"
 
     return None
+
+
+def _temperature_selector() -> NumberSelector:
+    """Return the selector used for an outdoor temperature bound."""
+    return NumberSelector(
+        NumberSelectorConfig(min=-80, max=80, step=0.5, mode=NumberSelectorMode.BOX)
+    )
 
 
 def _initial_schema(defaults: dict[str, Any] | None = None) -> vol.Schema:
@@ -476,14 +484,19 @@ class ScheduledClimateOptionsFlow(config_entries.OptionsFlow):
 
         if user_input is not None:
             name = user_input[CONF_NAME].strip()
+            minimum = user_input.get(CONF_PLAN_MIN_OUTDOOR_TEMP)
+            maximum = user_input.get(CONF_PLAN_MAX_OUTDOOR_TEMP)
             if room.plan_by_name(name) is not None:
                 errors[CONF_NAME] = "plan_name_taken"
+            elif minimum is not None and maximum is not None and minimum >= maximum:
+                errors["base"] = "plan_band_inverted"
             else:
                 plan = PlanConfig(
                     id=new_key(),
                     name=name,
                     icon=user_input.get(CONF_PLAN_ICON) or None,
-                    min_outdoor_temp=user_input.get(CONF_PLAN_MIN_OUTDOOR_TEMP),
+                    min_outdoor_temp=minimum,
+                    max_outdoor_temp=maximum,
                 )
                 return self.async_create_entry(
                     data=options_from_config(room, plans=[*room.plans, plan])
@@ -495,11 +508,8 @@ class ScheduledClimateOptionsFlow(config_entries.OptionsFlow):
                 {
                     vol.Required(CONF_NAME): TextSelector(),
                     vol.Optional(CONF_PLAN_ICON): IconSelector(),
-                    vol.Optional(CONF_PLAN_MIN_OUTDOOR_TEMP): NumberSelector(
-                        NumberSelectorConfig(
-                            min=-80, max=80, step=0.5, mode=NumberSelectorMode.BOX
-                        )
-                    ),
+                    vol.Optional(CONF_PLAN_MIN_OUTDOOR_TEMP): _temperature_selector(),
+                    vol.Optional(CONF_PLAN_MAX_OUTDOOR_TEMP): _temperature_selector(),
                 }
             ),
             errors=errors,
@@ -559,14 +569,19 @@ class ScheduledClimateOptionsFlow(config_entries.OptionsFlow):
             else:
                 name = user_input[CONF_NAME].strip()
                 clash = room.plan_by_name(name)
+                minimum = user_input.get(CONF_PLAN_MIN_OUTDOOR_TEMP)
+                maximum = user_input.get(CONF_PLAN_MAX_OUTDOOR_TEMP)
                 if clash is not None and clash.id != plan.id:
                     errors[CONF_NAME] = "plan_name_taken"
+                elif minimum is not None and maximum is not None and minimum >= maximum:
+                    errors["base"] = "plan_band_inverted"
                 else:
                     updated = replace(
                         plan,
                         name=name,
                         icon=user_input.get(CONF_PLAN_ICON) or None,
-                        min_outdoor_temp=user_input.get(CONF_PLAN_MIN_OUTDOOR_TEMP),
+                        min_outdoor_temp=minimum,
+                        max_outdoor_temp=maximum,
                     )
                     plans = [
                         updated if existing.id == plan.id else existing
@@ -588,11 +603,15 @@ class ScheduledClimateOptionsFlow(config_entries.OptionsFlow):
                     if plan.min_outdoor_temp is not None
                     else vol.UNDEFINED
                 ),
-            ): NumberSelector(
-                NumberSelectorConfig(
-                    min=-80, max=80, step=0.5, mode=NumberSelectorMode.BOX
-                )
-            ),
+            ): _temperature_selector(),
+            vol.Optional(
+                CONF_PLAN_MAX_OUTDOOR_TEMP,
+                default=(
+                    plan.max_outdoor_temp
+                    if plan.max_outdoor_temp is not None
+                    else vol.UNDEFINED
+                ),
+            ): _temperature_selector(),
             vol.Required(CONF_REMOVE, default=False): BooleanSelector(),
         }
         return self.async_show_form(

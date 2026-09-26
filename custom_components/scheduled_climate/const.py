@@ -22,6 +22,7 @@ CONF_PLAN_ID = "id"
 CONF_PLAN_NAME = "name"
 CONF_PLAN_ICON = "icon"
 CONF_PLAN_MIN_OUTDOOR_TEMP = "min_outdoor_temp"
+CONF_PLAN_MAX_OUTDOOR_TEMP = "max_outdoor_temp"
 CONF_PLAN_SCHEDULES = "schedules"
 
 CONF_PLAN_SELECTION = "plan_selection"

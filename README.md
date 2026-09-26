@@ -91,7 +91,7 @@ Upgrading from a release that used a single daily on and off time keeps those ti
 
 Each room exposes `select.<room>_schedule_plan`, whose options are every plan name plus **Automatic** when an automatic rule is configured. Whatever that select holds is what the whole room follows.
 
-Give each plan the outdoor temperature at or above which it takes over and the plans form ascending bands. A configurable hysteresis keeps the active plan until the reading leaves its band by half that width, and a sustain window makes a new band hold for a while before the plan actually switches. Choosing a plan by hand overrides the sensor until **Automatic** is selected again.
+Give each plan the outdoor temperature band it applies to and the plans form a ladder. A plan can name a lower bound (`18` and above — a warm-weather plan), an upper bound (below `2` — a frost plan), both (`8` to `16` — a shoulder season), or neither (the fallback). Bands are half open so neighbours never overlap, and where they do overlap the more specific band wins. A configurable hysteresis keeps the active plan until the reading clears either end of its band by half that width, and a sustain window makes a new band hold for a while before the plan actually switches. Choosing a plan by hand overrides the sensor until **Automatic** is selected again.
 
 ## Holds
 

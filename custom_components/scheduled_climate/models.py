@@ -30,6 +30,7 @@ from .const import (
     CONF_OVERRIDE_MAX_MINUTES,
     CONF_PLAN_ICON,
     CONF_PLAN_ID,
+    CONF_PLAN_MAX_OUTDOOR_TEMP,
     CONF_PLAN_MIN_OUTDOOR_TEMP,
     CONF_PLAN_NAME,
     CONF_PLAN_SCHEDULES,
@@ -179,6 +180,7 @@ class PlanConfig:
     name: str
     icon: str | None = None
     min_outdoor_temp: float | None = None
+    max_outdoor_temp: float | None = None
     schedules: Mapping[str, str] = field(default_factory=lambda: EMPTY_MAPPING)
 
     @classmethod
@@ -201,6 +203,7 @@ class PlanConfig:
             name=name,
             icon=icon if isinstance(icon, str) and icon else None,
             min_outdoor_temp=_as_float(data.get(CONF_PLAN_MIN_OUTDOOR_TEMP)),
+            max_outdoor_temp=_as_float(data.get(CONF_PLAN_MAX_OUTDOOR_TEMP)),
             schedules=MappingProxyType(schedules),
         )
 
@@ -215,7 +218,51 @@ class PlanConfig:
             data[CONF_PLAN_ICON] = self.icon
         if self.min_outdoor_temp is not None:
             data[CONF_PLAN_MIN_OUTDOOR_TEMP] = self.min_outdoor_temp
+        if self.max_outdoor_temp is not None:
+            data[CONF_PLAN_MAX_OUTDOOR_TEMP] = self.max_outdoor_temp
         return data
+
+    @property
+    def bounded(self) -> bool:
+        """Return whether this plan restricts itself to a temperature band."""
+        return self.min_outdoor_temp is not None or self.max_outdoor_temp is not None
+
+    def matches(self, temperature: float, widen: float = 0.0) -> bool:
+        """Return whether an outdoor reading falls inside this plan's band.
+
+        The band is half open, ``[min, max)``, so neighbouring plans that share
+        a boundary never both match. ``widen`` stretches the band outwards by
+        the given amount, which is how the hysteresis keeps the plan already in
+        force until the reading has clearly left it.
+        """
+        if (
+            self.min_outdoor_temp is not None
+            and temperature < self.min_outdoor_temp - widen
+        ):
+            return False
+        return not (
+            self.max_outdoor_temp is not None
+            and temperature >= self.max_outdoor_temp + widen
+        )
+
+    @property
+    def match_rank(self) -> tuple[int, float]:
+        """Return the sort key that puts the most specific band first.
+
+        A plan naming both ends wins over one naming a single end, which wins
+        over the unbounded fallback. Within a tier the warmest lower bound and
+        the coldest upper bound are tried first, so overlapping bands resolve
+        predictably.
+        """
+        low = self.min_outdoor_temp
+        high = self.max_outdoor_temp
+        if low is not None and high is not None:
+            return (0, -low)
+        if low is not None:
+            return (1, -low)
+        if high is not None:
+            return (2, high)
+        return (3, 0.0)
 
     def schedule_for(self, target_key: str) -> str | None:
         """Return the schedule helper entity id used for one target."""
@@ -233,6 +280,7 @@ class PlanConfig:
             name=self.name,
             icon=self.icon,
             min_outdoor_temp=self.min_outdoor_temp,
+            max_outdoor_temp=self.max_outdoor_temp,
             schedules=MappingProxyType(schedules),
         )
 
@@ -409,8 +457,8 @@ class RoomConfig:
     def ordered_plans(self) -> tuple[PlanConfig, ...]:
         """Return plans ordered by outdoor temperature band, coldest first.
 
-        Plans without a threshold form the base band and sort first, keeping
-        their configured order so the fallback plan stays predictable.
+        Plans without a lower bound sort first, keeping their configured order
+        so the fallback plan stays predictable.
         """
         return tuple(
             sorted(
@@ -418,6 +466,27 @@ class RoomConfig:
                 key=lambda plan: (
                     plan.min_outdoor_temp is not None,
                     plan.min_outdoor_temp if plan.min_outdoor_temp is not None else 0.0,
+                ),
+            )
+        )
+
+    @property
+    def match_order(self) -> tuple[PlanConfig, ...]:
+        """Return plans most-specific-band first, for resolving a reading.
+
+        Two bounded plans sharing a rank are tried in reverse configured
+        order, so the last band a user defined wins when both start at the
+        same temperature. Unbounded plans keep their configured order, so the
+        first one defined stays the room's fallback.
+        """
+        indexed = list(enumerate(self.plans))
+        return tuple(
+            plan
+            for _, plan in sorted(
+                indexed,
+                key=lambda pair: (
+                    pair[1].match_rank,
+                    -pair[0] if pair[1].bounded else pair[0],
                 ),
             )
         )

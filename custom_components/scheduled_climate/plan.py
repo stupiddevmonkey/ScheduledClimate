@@ -254,34 +254,62 @@ class PlanSelector:
     def _band_for(self, temperature: float) -> PlanConfig | None:
         """Return the plan whose temperature band holds the reading.
 
-        The plan currently in force keeps its band until the reading leaves it
-        by half the hysteresis width, so a reading hovering on a boundary does
-        not switch plans back and forth.
+        Plans are tried most specific first, so a plan naming both ends of a
+        band beats one naming a single end, which beats the unbounded
+        fallback.
+
+        A hysteresis dead zone straddles every boundary. To take over, a more
+        specific plan must match its band narrowed by half the hysteresis, so
+        the reading is clearly inside it. To keep its place, the plan already
+        in force only has to match its band widened by the same amount. A
+        reading hovering on a boundary therefore leaves the plan unchanged.
         """
-        ordered = self._config.ordered_plans
-        if not ordered:
+        candidates = self._config.match_order
+        if not candidates:
             return None
 
         half = self._config.plan_selection.hysteresis / 2
         current = self.active_plan
-        current_index = (
-            ordered.index(current)
-            if current is not None and current in ordered
-            else None
-        )
 
-        selected = 0
-        for index, plan in enumerate(ordered):
-            if plan.min_outdoor_temp is None:
-                continue
-            threshold = plan.min_outdoor_temp
-            if current_index is not None and index <= current_index:
-                threshold -= half
-            else:
-                threshold += half
-            if temperature >= threshold:
-                selected = index
-        return ordered[selected]
+        if current is not None:
+            challenger = next(
+                (
+                    plan
+                    for plan in candidates
+                    if plan is not current
+                    and plan.match_rank < current.match_rank
+                    and plan.matches(temperature, widen=-half)
+                ),
+                None,
+            )
+            if challenger is not None:
+                return challenger
+            if current.matches(temperature, widen=half):
+                return current
+
+        best = next((plan for plan in candidates if plan.matches(temperature)), None)
+        if best is not None:
+            return best
+
+        # Every band excludes the reading, which only happens when the plans
+        # leave a gap. Hold the current plan rather than dropping the room's
+        # schedule, and otherwise fall back to the nearest band.
+        return current or self._nearest_band(temperature)
+
+    def _nearest_band(self, temperature: float) -> PlanConfig | None:
+        """Return the plan whose band sits closest to an uncovered reading."""
+
+        def distance(plan: PlanConfig) -> float:
+            low = plan.min_outdoor_temp
+            high = plan.max_outdoor_temp
+            if low is not None and temperature < low:
+                return low - temperature
+            if high is not None and temperature >= high:
+                return temperature - high
+            return 0.0
+
+        ordered = self._config.ordered_plans
+        return min(ordered, key=distance) if ordered else None
 
     def _candidate(self) -> PlanConfig | None:
         """Return the plan the current configuration and reading imply."""

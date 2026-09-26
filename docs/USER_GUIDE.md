@@ -124,7 +124,16 @@ data:
 
 ### Automatic selection from an outdoor temperature sensor
 
-Set **Plan selection** to *Follow an outdoor temperature sensor* and choose the sensor. Then give each plan the outdoor temperature at or above which it should take over. Plans form ascending bands, and the plan with no threshold is the base band used when it is colder than every other plan.
+Set **Plan selection** to *Follow an outdoor temperature sensor* and choose the sensor. Then give each plan the outdoor temperature band it applies to. A plan can name a lower bound, an upper bound, both, or neither:
+
+| Plan bounds | Applies when |
+| --- | --- |
+| Lower only, e.g. `18` | The outdoor temperature is **at or above 18** — a warm-weather plan. |
+| Upper only, e.g. `2` | The outdoor temperature is **below 2** — a cold-weather or frost plan. |
+| Both, e.g. `8` and `16` | The temperature is **at or above 8 and below 16** — a shoulder-season plan. |
+| Neither | Nothing else matches. This is the room's fallback plan. |
+
+Bands are half open, so a plan ending at `16` and one starting at `16` never overlap. Where two bands do overlap, the more specific one wins: a plan naming both bounds beats one naming a single bound, which beats the unbounded fallback.
 
 ![Plan selection settings](images/options-plan-selection.png)
 
@@ -134,9 +143,9 @@ Set **Plan selection** to *Follow an outdoor temperature sensor* and choose the 
 | **Hysteresis** | The width of the dead band around each threshold. The active plan keeps its band until the reading leaves it by half this width, which stops the selection flapping at a boundary. |
 | **Sustain the reading for** | How long a new band must hold continuously before the plan actually switches. Set to `0` to switch immediately. |
 
-For example, with a `Winter` plan that has no threshold, a `Summer` plan set to `18`, and a hysteresis of `2`: the room moves to `Summer` at `19` and back to `Winter` below `17`.
+For example, with a `Winter` plan that has no bounds, a `Summer` plan starting at `18`, and a hysteresis of `2`: the room moves to `Summer` at `19` and back to `Winter` below `17`. The same dead zone applies to an upper bound, so a `Frost` plan ending at `2` is entered below `1` and left at `3`.
 
-Selecting a plan by hand overrides the sensor and stays put until **Automatic** is selected again. If the sensor becomes unavailable or stops reporting a number, the last resolved plan stays in force and a repair issue is raised.
+Selecting a plan by hand overrides the sensor and stays put until **Automatic** is selected again. If the sensor becomes unavailable or stops reporting a number, the last resolved plan stays in force and a repair issue is raised. If your plans leave a gap that no band covers, the plan already in force simply stays.
 
 ## Add the dashboard card
 
