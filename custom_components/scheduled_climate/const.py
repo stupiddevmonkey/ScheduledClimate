@@ -98,6 +98,7 @@ ATTR_MIN_HUMIDITY = "min_humidity"
 ATTR_MIN_TEMP = "min_temp"
 
 ATTR_TARGET_KEY = "target_key"
+ATTR_TARGET_NAME = "target_name"
 ATTR_ROOM_ENTITIES = "room_entities"
 ATTR_PLAN_OPTIONS = "plan_options"
 ATTR_PLAN_SCHEDULES = "plan_schedules"

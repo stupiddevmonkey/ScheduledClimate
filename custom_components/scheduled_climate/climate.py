@@ -94,6 +94,7 @@ from .const import (
     ATTR_SCHEDULE_ISSUES,
     ATTR_TARGET_HUMIDITY_STEP,
     ATTR_TARGET_KEY,
+    ATTR_TARGET_NAME,
     ATTR_TARGET_TEMP_STEP,
     ATTR_TEMPERATURE_UNIT,
     ATTR_TIMER_ACTION,
@@ -401,6 +402,7 @@ class ScheduledClimateEntity(ClimateEntity):
 
         return {
             ATTR_TARGET_KEY: controller.target.key,
+            ATTR_TARGET_NAME: controller.target.name,
             ATTR_ROOM_ENTITIES: coordinator.async_room_entity_ids(),
             ATTR_SCHEDULE_ENABLED: controller.enabled,
             ATTR_SCHEDULE_ENTITY_ID: controller.schedule_entity_id,

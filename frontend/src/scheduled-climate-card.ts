@@ -8,6 +8,7 @@ import type {
   ScheduledClimateCardConfig,
 } from "./types";
 import { DEFAULT_PRESETS } from "./types";
+import { targetLabel } from "./schedule";
 
 declare global {
   interface Window {
@@ -283,7 +284,7 @@ export class ScheduledClimateCard extends LitElement {
       <div class="target-chips" role="tablist" aria-label="Room targets">
         ${room.map((entityId) => {
           const state = this.hass?.states[entityId];
-          const label = state?.attributes.friendly_name ?? entityId;
+          const label = targetLabel(state, entityId);
           const selected = entityId === this._selectedId;
           return html`<button
             role="tab"

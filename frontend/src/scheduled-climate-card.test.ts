@@ -302,6 +302,47 @@ describe("scheduled-climate-card", () => {
     expect(chips!.textContent).toContain("Living room fan");
   });
 
+  it("labels target chips with the target name, not the room-prefixed one", async () => {
+    // The wrapper sets has_entity_name, so friendly_name is always
+    // "<room device> <target>". Every entity in a room shares that prefix, so
+    // using it makes chips too long to read and they truncate.
+    const roomState = state({
+      room_entities: [ENTITY_ID, SECOND_ID],
+      friendly_name: "Family Room Climate Schedule Minisplit",
+      target_name: "Minisplit",
+    });
+    const secondState: HassEntity = {
+      ...state(),
+      entity_id: SECOND_ID,
+      attributes: {
+        ...state().attributes,
+        room_entities: [ENTITY_ID, SECOND_ID],
+        friendly_name: "Family Room Climate Schedule Radiant",
+        target_name: "Radiant",
+      },
+    };
+
+    const card = new ScheduledClimateCard();
+    card.setConfig({ type: "custom:scheduled-climate-card", entity: ENTITY_ID });
+    card.hass = {
+      states: { [ENTITY_ID]: roomState, [SECOND_ID]: secondState },
+      user: { is_admin: true },
+      callService: vi.fn().mockResolvedValue(undefined),
+      callWS: vi.fn().mockResolvedValue([schedule()]),
+    };
+    document.body.append(card);
+    await card.updateComplete;
+
+    const labels = [
+      ...card.shadowRoot!.querySelectorAll(".target-chips button"),
+    ].map((chip) => chip.textContent?.trim());
+    expect(labels).toEqual(["Minisplit", "Radiant"]);
+    for (const label of labels) {
+      expect(label).not.toContain("Family Room Climate Schedule");
+    }
+    card.remove();
+  });
+
   it("selects a plan from the plan chip", async () => {
     const { card, callService } = await renderCard(
       state({

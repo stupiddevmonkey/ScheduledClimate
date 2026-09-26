@@ -36,6 +36,7 @@ export interface HassEntity {
     timer_action?: string | null;
     timer_deadline?: string | null;
     target_key?: string;
+    target_name?: string;
     room_entities?: string[];
     plan_options?: string[];
     active_plan?: string | null;

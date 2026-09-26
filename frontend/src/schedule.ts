@@ -1,5 +1,21 @@
 import type { ScheduleDay, ScheduleItem, ScheduleTimeRange } from "./types";
 import { SCHEDULE_DAYS } from "./types";
+import type { HassEntity } from "./types";
+
+/**
+ * Return the short label for one wrapper entity.
+ *
+ * The wrapper sets `has_entity_name`, so its `friendly_name` is always the
+ * room's device name followed by the target's name. Inside a room every
+ * entity shares that prefix, which only makes chips and tabs too long to
+ * read, so prefer the target's own name.
+ */
+export function targetLabel(
+  state: HassEntity | undefined,
+  entityId: string,
+): string {
+  return state?.attributes.target_name ?? state?.attributes.friendly_name ?? entityId;
+}
 
 export interface BlockDraft {
   index: number | null;

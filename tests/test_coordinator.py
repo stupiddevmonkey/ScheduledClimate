@@ -11,6 +11,7 @@ from homeassistant.components.climate import (
 from homeassistant.components.climate import DOMAIN as CLIMATE_DOMAIN
 from homeassistant.components.schedule import DOMAIN as SCHEDULE_DOMAIN
 from homeassistant.const import (
+    ATTR_FRIENDLY_NAME,
     ATTR_SUPPORTED_FEATURES,
     STATE_OFF,
     STATE_ON,
@@ -29,6 +30,7 @@ from custom_components.scheduled_climate.const import (
     ATTR_SCHEDULE_ENABLED,
     ATTR_SCHEDULE_ENTITY_ID,
     ATTR_TARGET_KEY,
+    ATTR_TARGET_NAME,
     ATTR_TEMPERATURE_UNIT,
     CONF_TARGET_ENTITY_ID,
     DOMAIN,
@@ -200,6 +202,12 @@ async def test_room_controls_several_climate_entities(
     radiant_state = hass.states.get(radiant)
     assert mini_split_state.attributes[ATTR_ROOM_ENTITIES] == [mini_split, radiant]
     assert radiant_state.attributes[ATTR_ROOM_ENTITIES] == [mini_split, radiant]
+
+    # The short target name is published so the card does not have to strip the
+    # room prefix out of friendly_name.
+    assert mini_split_state.attributes[ATTR_TARGET_NAME] == "Mini split"
+    assert radiant_state.attributes[ATTR_TARGET_NAME] == "Radiant heater"
+    assert mini_split_state.attributes[ATTR_FRIENDLY_NAME] == "Living Room Mini split"
 
     # Each target follows its own helper for the active plan.
     assert (

@@ -1,7 +1,7 @@
 import { LitElement, css, html, nothing } from "lit";
 import type { HomeAssistant, ScheduleDay } from "./types";
 import { SCHEDULE_DAYS } from "./types";
-import { DAY_GROUPS, DAY_LABELS } from "./schedule";
+import { DAY_GROUPS, DAY_LABELS, targetLabel } from "./schedule";
 import { dialogStyles } from "./dialog-styles";
 
 export interface CopyDestination {
@@ -61,7 +61,7 @@ export class ScheduledClimateCopyDialog extends LitElement {
     const options: DestinationOption[] = [];
     for (const entityId of this.roomEntities) {
       const attrs = this.hass?.states[entityId]?.attributes;
-      const friendly = attrs?.friendly_name ?? entityId;
+      const friendly = targetLabel(this.hass?.states[entityId], entityId);
       const schedules = attrs?.plan_schedules ?? {};
       const plans = attrs?.plan_options ?? this.planOptions;
       for (const plan of plans) {

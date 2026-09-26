@@ -18,6 +18,7 @@ import {
   findBlockIndex,
   shortTime,
   sortBlocks,
+  targetLabel,
   timeRangeToDraft,
   todayDay,
   validateDraft,
@@ -584,7 +585,7 @@ export class ScheduledClimateScheduleDialog extends LitElement {
                     aria-selected=${entityId === this._selectedTarget}
                     class=${`ghost ${entityId === this._selectedTarget ? "selected" : ""}`}
                     @click=${() => this._selectTarget(entityId)}
-                  >${this.hass?.states[entityId]?.attributes.friendly_name ?? entityId}</button>`,
+                  >${targetLabel(this.hass?.states[entityId], entityId)}</button>`,
                 )}
               </div>`
             : nothing}
